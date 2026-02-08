@@ -14,7 +14,8 @@ import {
   Download,
   RefreshCw,
   ChevronDown,
-  Search
+  Search,
+  Brain
 } from 'lucide-react'
 import {
   getMLSummary,
@@ -24,8 +25,9 @@ import {
   getCableFailurePredictions,
   getCombinedRiskByRegion
 } from '../services/api'
+import { MLExplainability } from '../components/MLExplainability'
 
-type TabType = 'overview' | 'health' | 'vegetation' | 'ignition' | 'cable'
+type TabType = 'overview' | 'health' | 'vegetation' | 'ignition' | 'cable' | 'explainability'
 
 interface MLModel {
   name: string
@@ -101,7 +103,8 @@ const tabs: { id: TabType; label: string; icon: React.ReactNode; color: string }
   { id: 'health', label: 'Asset Health', icon: <TrendingDown size={16} />, color: 'blue' },
   { id: 'vegetation', label: 'Vegetation', icon: <TreePine size={16} />, color: 'green' },
   { id: 'ignition', label: 'Ignition Risk', icon: <Flame size={16} />, color: 'orange' },
-  { id: 'cable', label: 'Water Treeing', icon: <Zap size={16} />, color: 'purple' }
+  { id: 'cable', label: 'Water Treeing', icon: <Zap size={16} />, color: 'purple' },
+  { id: 'explainability', label: 'Explainability', icon: <Brain size={16} />, color: 'purple' }
 ]
 
 function StatusBadge({ status, size = 'md' }: { status: string; size?: 'sm' | 'md' }) {
@@ -481,13 +484,13 @@ export function MLPredictions() {
                       <div className="mt-3 h-2 bg-gray-700 rounded-full overflow-hidden">
                         <div 
                           className={`h-full rounded-full ${
-                            region.AVG_RISK_SCORE > 60 ? 'bg-red-500' :
-                            region.AVG_RISK_SCORE > 40 ? 'bg-orange-500' : 'bg-green-500'
+                            Number(region.AVG_RISK_SCORE || 0) > 60 ? 'bg-red-500' :
+                            Number(region.AVG_RISK_SCORE || 0) > 40 ? 'bg-orange-500' : 'bg-green-500'
                           }`}
-                          style={{ width: `${Math.min(region.AVG_RISK_SCORE, 100)}%` }}
+                          style={{ width: `${Math.min(Number(region.AVG_RISK_SCORE || 0), 100)}%` }}
                         />
                       </div>
-                      <div className="text-xs text-slate-500 mt-1">Risk: {region.AVG_RISK_SCORE.toFixed(0)}/100</div>
+                      <div className="text-xs text-slate-500 mt-1">Risk: {Number(region.AVG_RISK_SCORE || 0).toFixed(0)}/100</div>
                     </div>
                   ))}
                 </div>
@@ -565,6 +568,10 @@ export function MLPredictions() {
             </div>
             <CableTable predictions={(cableData as { predictions: CablePrediction[] }).predictions || []} />
           </div>
+        )}
+        
+        {activeTab === 'explainability' && (
+          <MLExplainability />
         )}
       </div>
     </div>

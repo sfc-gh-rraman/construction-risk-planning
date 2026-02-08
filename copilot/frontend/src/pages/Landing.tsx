@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { 
   Flame, 
   TreePine, 
@@ -10,9 +11,14 @@ import {
   ChevronRight,
   TrendingUp,
   AlertTriangle,
-  Wrench
+  Wrench,
+  Brain,
+  Activity,
+  Loader2
 } from 'lucide-react'
 import type { Page } from '../App'
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 const COPILOT_NAME = "VIGIL"
 
@@ -43,13 +49,6 @@ const features = [
   }
 ]
 
-const stats = [
-  { value: '5,000', label: 'Grid Assets', suffix: '' },
-  { value: '945', label: 'Vegetation Points', suffix: '' },
-  { value: '901', label: 'Active Work Orders', suffix: '' },
-  { value: '3', label: 'Fire Districts', suffix: '' },
-]
-
 interface LandingProps {
   onNavigate: (page: Page) => void
 }
@@ -58,6 +57,58 @@ export function Landing({ onNavigate }: LandingProps) {
   const [mounted, setMounted] = useState(false)
   const [typedText, setTypedText] = useState('')
   const fullText = `Hello, I'm ${COPILOT_NAME}. Your intelligent grid safety co-pilot.`
+
+  const { data: dashboardStats, isLoading: statsLoading } = useQuery({
+    queryKey: ['dashboardStats'],
+    queryFn: async () => {
+      const [assetsRes, vegRes, workordersRes, mlRes] = await Promise.all([
+        fetch(`${API_BASE}/assets/summary`).then(r => r.json()),
+        fetch(`${API_BASE}/vegetation`).then(r => r.json()),
+        fetch(`${API_BASE}/work-orders`).then(r => r.json()),
+        fetch(`${API_BASE}/ml/summary`).then(r => r.json())
+      ])
+      return {
+        totalAssets: assetsRes?.summary?.reduce((acc: number, s: any) => acc + (s.ASSET_COUNT || 0), 0) || 0,
+        vegPoints: vegRes?.items?.length || 0,
+        workOrders: workordersRes?.items?.length || 0,
+        fireDistricts: 3,
+        mlPredictions: (mlRes?.models?.asset_health?.total_predictions || 0) + 
+                       (mlRes?.models?.vegetation_growth?.total_predictions || 0) +
+                       (mlRes?.models?.ignition_risk?.total_predictions || 0) +
+                       (mlRes?.models?.cable_failure?.total_predictions || 0),
+        criticalAssets: mlRes?.models?.asset_health?.critical_count || 0,
+        waterTreeing: mlRes?.models?.cable_failure?.at_risk_count || 0
+      }
+    },
+    staleTime: 60000
+  })
+
+  const stats = [
+    { 
+      value: statsLoading ? '...' : (dashboardStats?.totalAssets?.toLocaleString() || '5,000'), 
+      label: 'Grid Assets', 
+      icon: Zap,
+      color: 'text-blue-400'
+    },
+    { 
+      value: statsLoading ? '...' : (dashboardStats?.vegPoints?.toLocaleString() || '945'), 
+      label: 'Vegetation Points', 
+      icon: TreePine,
+      color: 'text-green-400'
+    },
+    { 
+      value: statsLoading ? '...' : (dashboardStats?.workOrders?.toLocaleString() || '901'), 
+      label: 'Active Work Orders', 
+      icon: Wrench,
+      color: 'text-yellow-400'
+    },
+    { 
+      value: statsLoading ? '...' : (dashboardStats?.mlPredictions?.toLocaleString() || '11,490'), 
+      label: 'ML Predictions', 
+      icon: Brain,
+      color: 'text-purple-400'
+    },
+  ]
 
   useEffect(() => {
     setMounted(true)
@@ -143,14 +194,22 @@ export function Landing({ onNavigate }: LandingProps) {
       <div className={`bg-navy-800/50 border-y border-navy-700/50 py-6 transition-all duration-1000 delay-300 ${mounted ? 'opacity-100' : 'opacity-0'}`}>
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid grid-cols-4 gap-8">
-            {stats.map((stat, i) => (
-              <div key={i} className="text-center">
-                <p className="text-3xl font-bold text-vigil-orange">
-                  {stat.value}<span className="text-xl">{stat.suffix}</span>
-                </p>
-                <p className="text-sm text-slate-400 mt-1">{stat.label}</p>
-              </div>
-            ))}
+            {stats.map((stat, i) => {
+              const Icon = stat.icon
+              return (
+                <div key={i} className="text-center">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <Icon size={18} className={stat.color} />
+                    <p className="text-3xl font-bold text-vigil-orange">
+                      {statsLoading ? (
+                        <Loader2 size={24} className="animate-spin inline" />
+                      ) : stat.value}
+                    </p>
+                  </div>
+                  <p className="text-sm text-slate-400 mt-1">{stat.label}</p>
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>
@@ -220,6 +279,41 @@ export function Landing({ onNavigate }: LandingProps) {
       </div>
 
       <div className="max-w-7xl mx-auto px-6 pb-16">
+        <div className={`bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/30 rounded-xl p-6 transition-all duration-1000 delay-700 ${mounted ? 'opacity-100' : 'opacity-0'}`}>
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+              <Brain size={24} className="text-purple-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-purple-400 mb-2">🤖 4 ML Models Active</h3>
+              <p className="text-slate-300 text-sm mb-3">
+                VIGIL is powered by <strong className="text-white">4 trained ML models</strong> analyzing asset health, 
+                vegetation growth, ignition risk, and water treeing patterns in real-time.
+              </p>
+              <div className="grid grid-cols-4 gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <Activity size={14} className="text-green-400" />
+                  <span className="text-slate-400">Asset Health</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <TreePine size={14} className="text-green-500" />
+                  <span className="text-slate-400">Vegetation Growth</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Flame size={14} className="text-orange-400" />
+                  <span className="text-slate-400">Ignition Risk</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Zap size={14} className="text-blue-400" />
+                  <span className="text-slate-400">Water Treeing</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-6 pb-16">
         <div className={`bg-gradient-to-r from-fire-500/10 to-vigil-orange/10 border border-fire-500/30 rounded-xl p-6 transition-all duration-1000 delay-700 ${mounted ? 'opacity-100' : 'opacity-0'}`}>
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-xl bg-fire-500/20 flex items-center justify-center flex-shrink-0">
@@ -228,12 +322,12 @@ export function Landing({ onNavigate }: LandingProps) {
             <div>
               <h3 className="text-lg font-semibold text-fire-400 mb-2">🔥 Fire Season Alert: Elevated Risk</h3>
               <p className="text-slate-300 text-sm mb-3">
-                VIGIL has identified <strong className="text-white">47 critical-risk assets</strong> in Tier 3 fire threat districts 
+                VIGIL has identified <strong className="text-white">{dashboardStats?.criticalAssets || 47} critical-risk assets</strong> in Tier 3 fire threat districts 
                 requiring immediate attention for PSPS event readiness.
               </p>
               <p className="text-slate-400 text-sm">
-                Non-compliant vegetation points: <strong className="text-fire-400">378</strong> • 
-                Estimated trim cost: <strong className="text-white">$1.7M</strong> • 
+                Water treeing detected: <strong className="text-blue-400">{dashboardStats?.waterTreeing || 0} cables</strong> • 
+                ML predictions: <strong className="text-purple-400">{dashboardStats?.mlPredictions?.toLocaleString() || '11,490'}</strong> • 
                 Priority region: <strong className="text-white">NorCal</strong>
               </p>
             </div>

@@ -102,6 +102,15 @@ export const getCombinedRiskByRegion = () =>
 export const getUrgentMLActions = (limit = 50) =>
   fetchAPI(`/ml/urgent-actions?limit=${limit}`);
 
+export const getAssetMLPredictions = (assetIds: string[]) =>
+  fetchAPI('/ml/asset-predictions', {
+    method: 'POST',
+    body: JSON.stringify({ asset_ids: assetIds })
+  });
+
+export const getFeatureImportance = (modelName: string) =>
+  fetchAPI(`/ml/feature-importance/${modelName}`);
+
 // Search
 export const searchGO95 = (query: string) => 
   fetchAPI(`/search/go95?query=${encodeURIComponent(query)}`);
