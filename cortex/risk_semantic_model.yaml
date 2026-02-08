@@ -1,0 +1,1093 @@
+# =============================================================================
+# Cortex Analyst Semantic Model
+# VIGIL - Vegetation & Infrastructure Grid Intelligence Layer
+# =============================================================================
+
+name: risk_planning_model
+description: >
+  Semantic model for utility vegetation and infrastructure risk planning. Enables natural language
+  queries about asset health, vegetation encroachment, fire risk, work order optimization, and
+  regulatory compliance. Supports the "Hidden Discovery" pattern - Water Treeing detection in 
+  underground cables via AMI voltage dip correlation with rainfall.
+
+tables:
+  # ============================================
+  # ASSET - Core utility asset data
+  # ============================================
+  - name: assets
+    description: Utility assets (poles, transformers, conductors, underground cables) with health metrics and risk scores.
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ATOMIC
+      table: ASSET
+    primary_key:
+      columns: [asset_id]
+
+    dimensions:
+      - name: asset_id
+        description: Unique asset identifier.
+        expr: asset_id
+        data_type: TEXT
+
+      - name: asset_type
+        synonyms: ["type", "equipment type", "asset category"]
+        description: Type of utility asset.
+        expr: asset_type
+        data_type: TEXT
+        sample_values: ["POLE", "TRANSFORMER", "CONDUCTOR", "UNDERGROUND_CABLE", "SWITCH", "RECLOSER"]
+
+      - name: material
+        synonyms: ["construction", "material type"]
+        description: Construction material of the asset.
+        expr: material
+        data_type: TEXT
+        sample_values: ["WOOD", "STEEL", "COMPOSITE", "XLPE", "PILC", "ALUMINUM"]
+
+      - name: status
+        description: Current operational status.
+        expr: status
+        data_type: TEXT
+        sample_values: ["IN_SERVICE", "PENDING_INSPECTION", "SCHEDULED_REPLACEMENT", "OUT_OF_SERVICE"]
+
+      - name: circuit_id
+        description: Associated electrical circuit.
+        expr: circuit_id
+        data_type: TEXT
+
+      - name: location_id
+        description: Geographic location reference.
+        expr: location_id
+        data_type: TEXT
+
+      - name: fire_threat_district
+        synonyms: ["fire district", "HFTD", "fire zone", "threat tier"]
+        description: CPUC Fire Threat District classification.
+        expr: fire_threat_district
+        data_type: TEXT
+        sample_values: ["TIER_3", "TIER_2", "TIER_1", "NON_HFTD"]
+
+      - name: region
+        synonyms: ["area", "territory", "service area"]
+        description: Utility service region.
+        expr: region
+        data_type: TEXT
+        sample_values: ["NorCal", "SoCal", "PNW", "Southwest", "Mountain"]
+
+      - name: moisture_exposure
+        synonyms: ["moisture level", "wet conditions"]
+        description: Moisture exposure level for underground assets.
+        expr: moisture_exposure
+        data_type: TEXT
+        sample_values: ["HIGH", "MEDIUM", "LOW"]
+
+    time_dimensions:
+      - name: install_date
+        synonyms: ["installation date", "commissioned"]
+        description: Date asset was installed.
+        expr: install_date
+        data_type: DATE
+
+      - name: last_inspection_date
+        synonyms: ["last inspected", "inspection date"]
+        description: Date of last inspection.
+        expr: last_inspection_date
+        data_type: DATE
+
+      - name: next_inspection_due
+        description: Next scheduled inspection date.
+        expr: next_inspection_due
+        data_type: DATE
+
+    facts:
+      - name: asset_age_years
+        synonyms: ["age", "years in service"]
+        description: Asset age in years.
+        expr: asset_age_years
+        data_type: NUMBER
+
+      - name: health_score
+        synonyms: ["condition score", "asset health"]
+        description: Health score (0-100, higher = better condition).
+        expr: health_score
+        data_type: NUMBER
+
+      - name: risk_score
+        synonyms: ["risk level", "asset risk"]
+        description: Composite risk score (0-100, higher = more risk).
+        expr: risk_score
+        data_type: NUMBER
+
+      - name: replacement_cost
+        synonyms: ["cost to replace", "replacement value"]
+        description: Estimated cost to replace asset in dollars.
+        expr: replacement_cost
+        data_type: NUMBER
+
+      - name: criticality_factor
+        synonyms: ["criticality", "importance"]
+        description: Criticality factor based on customers served (1.0-5.0).
+        expr: criticality_factor
+        data_type: NUMBER
+
+      - name: latitude
+        description: Asset latitude for mapping.
+        expr: latitude
+        data_type: NUMBER
+
+      - name: longitude
+        description: Asset longitude for mapping.
+        expr: longitude
+        data_type: NUMBER
+
+    metrics:
+      - name: asset_count
+        synonyms: ["number of assets", "total assets"]
+        description: Count of assets.
+        expr: COUNT(DISTINCT assets.asset_id)
+
+      - name: high_risk_asset_count
+        synonyms: ["high risk assets", "critical assets"]
+        description: Count of assets with risk score above 70.
+        expr: SUM(CASE WHEN assets.risk_score > 70 THEN 1 ELSE 0 END)
+
+      - name: average_health_score
+        synonyms: ["avg health", "mean health score"]
+        description: Average health score across assets.
+        expr: AVG(assets.health_score)
+
+      - name: average_asset_age
+        description: Average asset age in years.
+        expr: AVG(assets.asset_age_years)
+
+      - name: total_replacement_value
+        description: Total replacement cost of all assets.
+        expr: SUM(assets.replacement_cost)
+
+      - name: tier_3_assets
+        synonyms: ["extreme fire risk assets"]
+        description: Count of assets in Tier 3 (extreme) fire threat districts.
+        expr: SUM(CASE WHEN assets.fire_threat_district = 'TIER_3' THEN 1 ELSE 0 END)
+
+  # ============================================
+  # CIRCUIT - Electrical circuit data
+  # ============================================
+  - name: circuits
+    description: Electrical circuits with voltage, customer count, and reliability metrics.
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ATOMIC
+      table: CIRCUIT
+    primary_key:
+      columns: [circuit_id]
+
+    dimensions:
+      - name: circuit_id
+        description: Unique circuit identifier.
+        expr: circuit_id
+        data_type: TEXT
+
+      - name: circuit_name
+        synonyms: ["circuit", "feeder"]
+        description: Circuit name/designation.
+        expr: circuit_name
+        data_type: TEXT
+
+      - name: voltage_class
+        synonyms: ["voltage", "voltage level"]
+        description: Voltage classification.
+        expr: voltage_class
+        data_type: TEXT
+        sample_values: ["12kV", "21kV", "34kV", "69kV"]
+
+      - name: substation
+        synonyms: ["sub", "source station"]
+        description: Source substation name.
+        expr: substation
+        data_type: TEXT
+
+      - name: region
+        description: Service region.
+        expr: region
+        data_type: TEXT
+
+    facts:
+      - name: customers_served
+        synonyms: ["customer count", "meters"]
+        description: Number of customers served by circuit.
+        expr: customers_served
+        data_type: NUMBER
+
+      - name: circuit_miles
+        synonyms: ["length", "miles"]
+        description: Total circuit length in miles.
+        expr: circuit_miles
+        data_type: NUMBER
+
+      - name: saidi_ytd
+        synonyms: ["SAIDI", "outage minutes"]
+        description: System Average Interruption Duration Index (minutes per customer YTD).
+        expr: saidi_ytd
+        data_type: NUMBER
+
+      - name: saifi_ytd
+        synonyms: ["SAIFI", "outage frequency"]
+        description: System Average Interruption Frequency Index (interruptions per customer YTD).
+        expr: saifi_ytd
+        data_type: NUMBER
+
+      - name: critical_facilities_count
+        synonyms: ["critical facilities", "essential services"]
+        description: Number of critical facilities (hospitals, fire stations) on circuit.
+        expr: critical_facilities_count
+        data_type: NUMBER
+
+    metrics:
+      - name: circuit_count
+        description: Count of circuits.
+        expr: COUNT(DISTINCT circuits.circuit_id)
+
+      - name: total_customers
+        description: Total customers across all circuits.
+        expr: SUM(circuits.customers_served)
+
+      - name: total_circuit_miles
+        description: Total circuit miles.
+        expr: SUM(circuits.circuit_miles)
+
+      - name: average_saidi
+        description: Average SAIDI across circuits.
+        expr: AVG(circuits.saidi_ytd)
+
+  # ============================================
+  # VEGETATION_ENCROACHMENT - Vegetation risks
+  # ============================================
+  - name: vegetation
+    description: Vegetation encroachment records with clearance measurements and compliance status.
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ATOMIC
+      table: VEGETATION_ENCROACHMENT
+    primary_key:
+      columns: [encroachment_id]
+
+    dimensions:
+      - name: encroachment_id
+        description: Unique encroachment record identifier.
+        expr: encroachment_id
+        data_type: TEXT
+
+      - name: asset_id
+        description: Associated asset with encroachment.
+        expr: asset_id
+        data_type: TEXT
+
+      - name: species
+        synonyms: ["tree species", "vegetation type"]
+        description: Tree or vegetation species.
+        expr: species
+        data_type: TEXT
+        sample_values: ["EUCALYPTUS", "OAK", "PINE", "PALM", "CEDAR", "JUNIPER", "CHAPARRAL"]
+
+      - name: compliance_status
+        synonyms: ["status", "GO95 status"]
+        description: CPUC GO95 compliance status.
+        expr: compliance_status
+        data_type: TEXT
+        sample_values: ["COMPLIANT", "NON_COMPLIANT", "AT_RISK", "CRITICAL"]
+
+      - name: fire_threat_district
+        description: Fire threat district of the encroachment location.
+        expr: fire_threat_district
+        data_type: TEXT
+
+      - name: priority
+        synonyms: ["trim priority", "urgency"]
+        description: Work order priority.
+        expr: priority
+        data_type: TEXT
+        sample_values: ["P1_EMERGENCY", "P2_URGENT", "P3_STANDARD", "P4_ROUTINE"]
+
+    time_dimensions:
+      - name: detected_date
+        synonyms: ["detected", "found date"]
+        description: Date encroachment was detected.
+        expr: detected_date
+        data_type: DATE
+
+      - name: projected_contact_date
+        synonyms: ["contact date", "grow-in date"]
+        description: Projected date vegetation will contact conductor.
+        expr: projected_contact_date
+        data_type: DATE
+
+    facts:
+      - name: current_clearance_ft
+        synonyms: ["clearance", "current distance"]
+        description: Current clearance from conductor in feet.
+        expr: current_clearance_ft
+        data_type: NUMBER
+
+      - name: required_clearance_ft
+        synonyms: ["required clearance", "GO95 requirement"]
+        description: CPUC GO95 required minimum clearance in feet.
+        expr: required_clearance_ft
+        data_type: NUMBER
+
+      - name: clearance_deficit_ft
+        synonyms: ["deficit", "shortage"]
+        description: Clearance deficit in feet (negative = compliant).
+        expr: clearance_deficit_ft
+        data_type: NUMBER
+
+      - name: growth_rate_ft_year
+        synonyms: ["growth rate"]
+        description: Annual vegetation growth rate in feet/year.
+        expr: growth_rate_ft_year
+        data_type: NUMBER
+
+      - name: days_to_contact
+        synonyms: ["time to contact", "days until contact"]
+        description: Predicted days until vegetation contacts conductor.
+        expr: days_to_contact
+        data_type: NUMBER
+
+      - name: ignition_probability
+        synonyms: ["fire probability", "ignition risk"]
+        description: Probability of ignition if not addressed (0-1).
+        expr: ignition_probability
+        data_type: NUMBER
+
+      - name: estimated_trim_cost
+        synonyms: ["trim cost", "cost"]
+        description: Estimated cost to remediate in dollars.
+        expr: estimated_trim_cost
+        data_type: NUMBER
+
+    metrics:
+      - name: encroachment_count
+        synonyms: ["total encroachments", "vegetation issues"]
+        description: Count of vegetation encroachments.
+        expr: COUNT(vegetation.encroachment_id)
+
+      - name: non_compliant_count
+        synonyms: ["GO95 violations", "non-compliant"]
+        description: Count of non-compliant encroachments.
+        expr: SUM(CASE WHEN vegetation.compliance_status IN ('NON_COMPLIANT', 'CRITICAL') THEN 1 ELSE 0 END)
+
+      - name: miles_requiring_trim
+        synonyms: ["miles to trim"]
+        description: Estimated miles of line requiring vegetation work.
+        expr: COUNT(DISTINCT vegetation.asset_id) * 0.1
+
+      - name: total_trim_cost
+        description: Total estimated vegetation management cost.
+        expr: SUM(vegetation.estimated_trim_cost)
+
+      - name: avg_days_to_contact
+        description: Average days until vegetation contact.
+        expr: AVG(vegetation.days_to_contact)
+
+      - name: critical_encroachments
+        description: Count of critical priority encroachments.
+        expr: SUM(CASE WHEN vegetation.priority = 'P1_EMERGENCY' THEN 1 ELSE 0 END)
+
+  # ============================================
+  # RISK_ASSESSMENT - Composite risk scores
+  # ============================================
+  - name: risk_assessments
+    description: Composite risk assessments combining multiple risk factors for each asset.
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ATOMIC
+      table: RISK_ASSESSMENT
+    primary_key:
+      columns: [assessment_id]
+
+    dimensions:
+      - name: assessment_id
+        description: Unique assessment identifier.
+        expr: assessment_id
+        data_type: TEXT
+
+      - name: asset_id
+        description: Assessed asset.
+        expr: asset_id
+        data_type: TEXT
+
+      - name: risk_category
+        synonyms: ["risk type", "category"]
+        description: Primary risk category.
+        expr: risk_category
+        data_type: TEXT
+        sample_values: ["VEGETATION", "EQUIPMENT_FAILURE", "WEATHER", "WILDLIFE", "THIRD_PARTY"]
+
+      - name: mitigation_status
+        description: Mitigation action status.
+        expr: mitigation_status
+        data_type: TEXT
+        sample_values: ["OPEN", "IN_PROGRESS", "MITIGATED", "ACCEPTED"]
+
+    time_dimensions:
+      - name: assessment_date
+        description: Date of risk assessment.
+        expr: assessment_date
+        data_type: DATE
+
+    facts:
+      - name: composite_risk_score
+        synonyms: ["risk score", "total risk"]
+        description: Composite risk score (0-100).
+        expr: composite_risk_score
+        data_type: NUMBER
+
+      - name: vegetation_risk_component
+        description: Vegetation risk component (0-100).
+        expr: vegetation_risk_component
+        data_type: NUMBER
+
+      - name: equipment_risk_component
+        description: Equipment failure risk component (0-100).
+        expr: equipment_risk_component
+        data_type: NUMBER
+
+      - name: weather_risk_component
+        description: Weather-related risk component (0-100).
+        expr: weather_risk_component
+        data_type: NUMBER
+
+      - name: consequence_score
+        description: Potential consequence severity (0-100).
+        expr: consequence_score
+        data_type: NUMBER
+
+      - name: probability_of_failure
+        synonyms: ["POF", "failure probability"]
+        description: Probability of failure (0-1).
+        expr: probability_of_failure
+        data_type: NUMBER
+
+      - name: risk_reduction_if_mitigated
+        description: Expected risk reduction if mitigated (0-100 points).
+        expr: risk_reduction_if_mitigated
+        data_type: NUMBER
+
+      - name: estimated_mitigation_cost
+        description: Estimated cost to mitigate risk.
+        expr: estimated_mitigation_cost
+        data_type: NUMBER
+
+    metrics:
+      - name: assessment_count
+        description: Count of risk assessments.
+        expr: COUNT(risk_assessments.assessment_id)
+
+      - name: avg_composite_risk
+        description: Average composite risk score.
+        expr: AVG(risk_assessments.composite_risk_score)
+
+      - name: high_risk_count
+        description: Count of high risk assessments (score > 70).
+        expr: SUM(CASE WHEN risk_assessments.composite_risk_score > 70 THEN 1 ELSE 0 END)
+
+      - name: risk_reduction_per_dollar
+        synonyms: ["risk ROI", "mitigation efficiency"]
+        description: Average risk reduction points per dollar spent.
+        expr: AVG(risk_assessments.risk_reduction_if_mitigated / NULLIF(risk_assessments.estimated_mitigation_cost, 0))
+
+  # ============================================
+  # WORK_ORDER - Work orders for risk mitigation
+  # ============================================
+  - name: work_orders
+    description: Work orders for vegetation management, equipment repair, and risk mitigation.
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ATOMIC
+      table: WORK_ORDER
+    primary_key:
+      columns: [work_order_id]
+
+    dimensions:
+      - name: work_order_id
+        description: Unique work order identifier.
+        expr: work_order_id
+        data_type: TEXT
+
+      - name: asset_id
+        description: Associated asset.
+        expr: asset_id
+        data_type: TEXT
+
+      - name: work_type
+        synonyms: ["type", "work category"]
+        description: Type of work.
+        expr: work_type
+        data_type: TEXT
+        sample_values: ["VEGETATION_TRIM", "EQUIPMENT_REPAIR", "POLE_REPLACEMENT", "INSPECTION", "EMERGENCY"]
+
+      - name: status
+        description: Work order status.
+        expr: status
+        data_type: TEXT
+        sample_values: ["PLANNED", "SCHEDULED", "IN_PROGRESS", "COMPLETED", "CANCELLED"]
+
+      - name: priority
+        synonyms: ["urgency"]
+        description: Work priority level.
+        expr: priority
+        data_type: TEXT
+        sample_values: ["P1_EMERGENCY", "P2_URGENT", "P3_STANDARD", "P4_ROUTINE"]
+
+      - name: crew_type
+        synonyms: ["crew", "resource type"]
+        description: Type of crew assigned.
+        expr: crew_type
+        data_type: TEXT
+        sample_values: ["LINE_CREW", "TREE_CREW", "INSPECTION", "CONTRACTOR"]
+
+      - name: region
+        description: Work order region.
+        expr: region
+        data_type: TEXT
+
+    time_dimensions:
+      - name: created_date
+        synonyms: ["created", "opened"]
+        description: Date work order was created.
+        expr: created_date
+        data_type: DATE
+
+      - name: scheduled_date
+        synonyms: ["scheduled", "planned date"]
+        description: Scheduled execution date.
+        expr: scheduled_date
+        data_type: DATE
+
+      - name: completed_date
+        synonyms: ["completed", "closed"]
+        description: Actual completion date.
+        expr: completed_date
+        data_type: DATE
+
+      - name: fire_season_deadline
+        synonyms: ["deadline", "must complete by"]
+        description: Fire season deadline for completion.
+        expr: fire_season_deadline
+        data_type: DATE
+
+    facts:
+      - name: estimated_cost
+        synonyms: ["cost", "budget"]
+        description: Estimated work order cost.
+        expr: estimated_cost
+        data_type: NUMBER
+
+      - name: actual_cost
+        description: Actual cost after completion.
+        expr: actual_cost
+        data_type: NUMBER
+
+      - name: estimated_hours
+        synonyms: ["hours", "duration"]
+        description: Estimated labor hours.
+        expr: estimated_hours
+        data_type: NUMBER
+
+      - name: risk_score_before
+        description: Asset risk score before work.
+        expr: risk_score_before
+        data_type: NUMBER
+
+      - name: risk_score_after
+        description: Asset risk score after work (projected or actual).
+        expr: risk_score_after
+        data_type: NUMBER
+
+      - name: risk_reduction
+        synonyms: ["risk mitigated"]
+        description: Risk score reduction achieved.
+        expr: risk_reduction
+        data_type: NUMBER
+
+    metrics:
+      - name: work_order_count
+        synonyms: ["total work orders", "WO count"]
+        description: Count of work orders.
+        expr: COUNT(work_orders.work_order_id)
+
+      - name: open_work_orders
+        description: Count of non-completed work orders.
+        expr: SUM(CASE WHEN work_orders.status NOT IN ('COMPLETED', 'CANCELLED') THEN 1 ELSE 0 END)
+
+      - name: completed_work_orders
+        description: Count of completed work orders.
+        expr: SUM(CASE WHEN work_orders.status = 'COMPLETED' THEN 1 ELSE 0 END)
+
+      - name: total_estimated_cost
+        description: Total estimated cost of work orders.
+        expr: SUM(work_orders.estimated_cost)
+
+      - name: total_actual_cost
+        description: Total actual cost of completed work.
+        expr: SUM(work_orders.actual_cost)
+
+      - name: total_risk_reduction
+        description: Total risk score reduction from work.
+        expr: SUM(work_orders.risk_reduction)
+
+      - name: emergency_work_orders
+        description: Count of emergency priority work orders.
+        expr: SUM(CASE WHEN work_orders.priority = 'P1_EMERGENCY' THEN 1 ELSE 0 END)
+
+  # ============================================
+  # AMI_READING - Smart meter data for Water Treeing detection
+  # ============================================
+  - name: ami_readings
+    description: AMI (smart meter) readings for detecting underground cable degradation patterns. Key for Water Treeing Hidden Discovery.
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ATOMIC
+      table: AMI_READING
+    primary_key:
+      columns: [reading_id]
+
+    dimensions:
+      - name: reading_id
+        description: Unique reading identifier.
+        expr: reading_id
+        data_type: TEXT
+
+      - name: asset_id
+        description: Associated asset (underground cable).
+        expr: asset_id
+        data_type: TEXT
+
+      - name: meter_id
+        synonyms: ["meter", "AMI meter"]
+        description: Smart meter identifier.
+        expr: meter_id
+        data_type: TEXT
+
+      - name: voltage_dip_flag
+        synonyms: ["voltage dip", "dip detected"]
+        description: Whether a voltage dip was detected.
+        expr: voltage_dip_flag
+        data_type: BOOLEAN
+
+      - name: rain_correlated_dip
+        synonyms: ["rain correlation", "moisture correlated"]
+        description: Whether voltage dip correlates with rainfall - KEY INDICATOR for Water Treeing.
+        expr: rain_correlated_dip
+        data_type: BOOLEAN
+
+    time_dimensions:
+      - name: reading_timestamp
+        synonyms: ["timestamp", "reading time"]
+        description: Timestamp of AMI reading.
+        expr: reading_timestamp
+        data_type: TIMESTAMP
+
+    facts:
+      - name: voltage_reading
+        synonyms: ["voltage", "V"]
+        description: Voltage reading in volts.
+        expr: voltage_reading
+        data_type: NUMBER
+
+      - name: voltage_deviation_pct
+        synonyms: ["deviation", "variance"]
+        description: Voltage deviation from nominal as percentage.
+        expr: voltage_deviation_pct
+        data_type: NUMBER
+
+      - name: power_factor
+        description: Power factor reading.
+        expr: power_factor
+        data_type: NUMBER
+
+      - name: rainfall_24h_inches
+        synonyms: ["rainfall", "rain"]
+        description: Rainfall in previous 24 hours (inches).
+        expr: rainfall_24h_inches
+        data_type: NUMBER
+
+    metrics:
+      - name: reading_count
+        description: Count of AMI readings.
+        expr: COUNT(ami_readings.reading_id)
+
+      - name: voltage_dip_count
+        synonyms: ["dip count", "voltage anomalies"]
+        description: Count of voltage dip events.
+        expr: SUM(CASE WHEN ami_readings.voltage_dip_flag = TRUE THEN 1 ELSE 0 END)
+
+      - name: rain_correlated_dip_count
+        synonyms: ["water treeing indicators", "rain correlated dips"]
+        description: Count of rain-correlated voltage dips - PRIMARY INDICATOR for Water Treeing.
+        expr: SUM(CASE WHEN ami_readings.rain_correlated_dip = TRUE THEN 1 ELSE 0 END)
+
+      - name: avg_voltage_deviation
+        description: Average voltage deviation percentage.
+        expr: AVG(ami_readings.voltage_deviation_pct)
+
+  # ============================================
+  # CABLE_FAILURE_PREDICTION - Water Treeing ML predictions
+  # ============================================
+  - name: cable_predictions
+    description: ML predictions for underground cable failures due to Water Treeing. The Hidden Discovery pattern.
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ML
+      table: CABLE_FAILURE_PREDICTION
+    primary_key:
+      columns: [prediction_id]
+
+    dimensions:
+      - name: prediction_id
+        description: Unique prediction identifier.
+        expr: prediction_id
+        data_type: TEXT
+
+      - name: asset_id
+        description: Underground cable asset being predicted.
+        expr: asset_id
+        data_type: TEXT
+
+      - name: failure_mode
+        synonyms: ["failure type", "degradation type"]
+        description: Predicted failure mode.
+        expr: failure_mode
+        data_type: TEXT
+        sample_values: ["WATER_TREEING", "THERMAL_DEGRADATION", "MECHANICAL_DAMAGE", "SPLICE_FAILURE"]
+
+      - name: risk_tier
+        synonyms: ["risk level", "tier"]
+        description: Risk classification tier.
+        expr: risk_tier
+        data_type: TEXT
+        sample_values: ["CRITICAL", "HIGH", "MEDIUM", "LOW"]
+
+    time_dimensions:
+      - name: prediction_date
+        description: Date prediction was generated.
+        expr: prediction_date
+        data_type: DATE
+
+      - name: predicted_failure_window_start
+        description: Start of predicted failure window.
+        expr: predicted_failure_window_start
+        data_type: DATE
+
+      - name: predicted_failure_window_end
+        description: End of predicted failure window.
+        expr: predicted_failure_window_end
+        data_type: DATE
+
+    facts:
+      - name: failure_probability
+        synonyms: ["probability", "likelihood"]
+        description: Probability of failure (0-1).
+        expr: failure_probability
+        data_type: NUMBER
+
+      - name: confidence_score
+        synonyms: ["confidence", "model confidence"]
+        description: Model confidence in prediction (0-1).
+        expr: confidence_score
+        data_type: NUMBER
+
+      - name: rain_correlation_score
+        synonyms: ["rain correlation", "moisture score"]
+        description: Strength of correlation between voltage dips and rainfall (0-1). High values indicate Water Treeing.
+        expr: rain_correlation_score
+        data_type: NUMBER
+
+      - name: voltage_dip_frequency
+        description: Frequency of voltage dips per month.
+        expr: voltage_dip_frequency
+        data_type: NUMBER
+
+      - name: cable_age_years
+        description: Age of the cable in years.
+        expr: cable_age_years
+        data_type: NUMBER
+
+      - name: estimated_replacement_cost
+        description: Estimated cost to replace cable segment.
+        expr: estimated_replacement_cost
+        data_type: NUMBER
+
+      - name: customer_impact_count
+        synonyms: ["customers affected", "impact"]
+        description: Number of customers affected if cable fails.
+        expr: customer_impact_count
+        data_type: NUMBER
+
+    metrics:
+      - name: prediction_count
+        description: Count of cable failure predictions.
+        expr: COUNT(cable_predictions.prediction_id)
+
+      - name: water_treeing_count
+        synonyms: ["water treeing cases", "moisture degradation"]
+        description: Count of Water Treeing predictions - THE HIDDEN DISCOVERY.
+        expr: SUM(CASE WHEN cable_predictions.failure_mode = 'WATER_TREEING' THEN 1 ELSE 0 END)
+
+      - name: high_risk_cables
+        description: Count of high/critical risk cable predictions.
+        expr: SUM(CASE WHEN cable_predictions.risk_tier IN ('CRITICAL', 'HIGH') THEN 1 ELSE 0 END)
+
+      - name: avg_rain_correlation
+        description: Average rain correlation score.
+        expr: AVG(cable_predictions.rain_correlation_score)
+
+      - name: total_replacement_cost
+        description: Total estimated replacement cost for at-risk cables.
+        expr: SUM(cable_predictions.estimated_replacement_cost)
+
+      - name: total_customers_at_risk
+        description: Total customers potentially affected by cable failures.
+        expr: SUM(cable_predictions.customer_impact_count)
+
+# ============================================
+# RELATIONSHIPS
+# ============================================
+relationships:
+  - name: assets_to_circuits
+    left_table: assets
+    right_table: circuits
+    relationship_columns:
+      - left_column: circuit_id
+        right_column: circuit_id
+
+  - name: assets_to_vegetation
+    left_table: assets
+    right_table: vegetation
+    relationship_columns:
+      - left_column: asset_id
+        right_column: asset_id
+
+  - name: assets_to_risk_assessments
+    left_table: assets
+    right_table: risk_assessments
+    relationship_columns:
+      - left_column: asset_id
+        right_column: asset_id
+
+  - name: assets_to_work_orders
+    left_table: assets
+    right_table: work_orders
+    relationship_columns:
+      - left_column: asset_id
+        right_column: asset_id
+
+  - name: assets_to_ami_readings
+    left_table: assets
+    right_table: ami_readings
+    relationship_columns:
+      - left_column: asset_id
+        right_column: asset_id
+
+  - name: assets_to_cable_predictions
+    left_table: assets
+    right_table: cable_predictions
+    relationship_columns:
+      - left_column: asset_id
+        right_column: asset_id
+
+# ============================================
+# VERIFIED QUERIES
+# ============================================
+verified_queries:
+  - name: portfolio_summary
+    question: "What is the asset portfolio summary?"
+    use_as_onboarding_question: true
+    sql: |
+      SELECT 
+        COUNT(DISTINCT asset_id) as total_assets,
+        ROUND(AVG(health_score), 1) as avg_health_score,
+        SUM(CASE WHEN risk_score > 70 THEN 1 ELSE 0 END) as high_risk_assets,
+        SUM(CASE WHEN fire_threat_district = 'TIER_3' THEN 1 ELSE 0 END) as tier_3_fire_zone_assets,
+        ROUND(SUM(replacement_cost) / 1000000, 1) as total_value_millions
+      FROM __assets
+
+  - name: fire_season_readiness
+    question: "How many days until fire season and what is our readiness status?"
+    use_as_onboarding_question: true
+    sql: |
+      SELECT 
+        DATEDIFF('day', CURRENT_DATE(), DATE_FROM_PARTS(YEAR(CURRENT_DATE()) + 
+          CASE WHEN MONTH(CURRENT_DATE()) >= 6 THEN 1 ELSE 0 END, 6, 1)) as days_to_fire_season,
+        COUNT(DISTINCT wo.work_order_id) as open_vegetation_work_orders,
+        SUM(CASE WHEN ve.compliance_status = 'NON_COMPLIANT' THEN 1 ELSE 0 END) as go95_violations
+      FROM __work_orders wo
+      LEFT JOIN __vegetation ve ON wo.asset_id = ve.asset_id
+      WHERE wo.status NOT IN ('COMPLETED', 'CANCELLED')
+        AND wo.work_type = 'VEGETATION_TRIM'
+
+  - name: high_risk_assets
+    question: "Which assets have the highest risk scores?"
+    use_as_onboarding_question: true
+    sql: |
+      SELECT 
+        a.asset_id,
+        a.asset_type,
+        a.region,
+        a.fire_threat_district,
+        a.risk_score,
+        a.health_score,
+        a.asset_age_years
+      FROM __assets a
+      WHERE a.risk_score > 70
+      ORDER BY a.risk_score DESC
+      LIMIT 20
+
+  - name: vegetation_compliance
+    question: "What is the GO95 vegetation compliance status by region?"
+    sql: |
+      SELECT 
+        a.region,
+        COUNT(DISTINCT v.encroachment_id) as total_encroachments,
+        SUM(CASE WHEN v.compliance_status = 'COMPLIANT' THEN 1 ELSE 0 END) as compliant,
+        SUM(CASE WHEN v.compliance_status = 'NON_COMPLIANT' THEN 1 ELSE 0 END) as non_compliant,
+        SUM(CASE WHEN v.compliance_status = 'CRITICAL' THEN 1 ELSE 0 END) as critical,
+        ROUND(SUM(v.estimated_trim_cost), 0) as total_trim_cost
+      FROM __vegetation v
+      JOIN __assets a ON v.asset_id = a.asset_id
+      GROUP BY a.region
+      ORDER BY non_compliant DESC
+
+  - name: work_order_backlog
+    question: "What is the work order backlog by priority?"
+    sql: |
+      SELECT 
+        priority,
+        COUNT(*) as work_order_count,
+        SUM(estimated_cost) as total_estimated_cost,
+        SUM(estimated_hours) as total_hours
+      FROM __work_orders
+      WHERE status NOT IN ('COMPLETED', 'CANCELLED')
+      GROUP BY priority
+      ORDER BY 
+        CASE priority 
+          WHEN 'P1_EMERGENCY' THEN 1 
+          WHEN 'P2_URGENT' THEN 2 
+          WHEN 'P3_STANDARD' THEN 3 
+          ELSE 4 
+        END
+
+  - name: water_treeing_detection
+    question: "Show me underground cables with Water Treeing indicators"
+    sql: |
+      SELECT 
+        cp.asset_id,
+        a.material,
+        cp.cable_age_years,
+        a.moisture_exposure,
+        cp.rain_correlation_score,
+        cp.voltage_dip_frequency,
+        cp.failure_probability,
+        cp.risk_tier,
+        cp.estimated_replacement_cost,
+        cp.customer_impact_count
+      FROM __cable_predictions cp
+      JOIN __assets a ON cp.asset_id = a.asset_id
+      WHERE cp.failure_mode = 'WATER_TREEING'
+        AND cp.rain_correlation_score > 0.6
+      ORDER BY cp.failure_probability DESC
+      LIMIT 20
+
+  - name: ami_rain_correlation
+    question: "Show me AMI voltage dips correlated with rainfall"
+    sql: |
+      SELECT 
+        a.asset_id,
+        a.material,
+        a.asset_age_years,
+        COUNT(*) as total_readings,
+        SUM(CASE WHEN ami.voltage_dip_flag THEN 1 ELSE 0 END) as voltage_dips,
+        SUM(CASE WHEN ami.rain_correlated_dip THEN 1 ELSE 0 END) as rain_correlated_dips,
+        AVG(ami.voltage_deviation_pct) as avg_deviation
+      FROM __ami_readings ami
+      JOIN __assets a ON ami.asset_id = a.asset_id
+      WHERE a.asset_type = 'UNDERGROUND_CABLE'
+      GROUP BY a.asset_id, a.material, a.asset_age_years
+      HAVING SUM(CASE WHEN ami.rain_correlated_dip THEN 1 ELSE 0 END) > 5
+      ORDER BY rain_correlated_dips DESC
+
+  - name: risk_reduction_efficiency
+    question: "Which work orders provide the best risk reduction per dollar?"
+    sql: |
+      SELECT 
+        work_order_id,
+        work_type,
+        region,
+        priority,
+        estimated_cost,
+        risk_reduction,
+        ROUND(risk_reduction / NULLIF(estimated_cost, 0) * 1000, 2) as risk_points_per_1000_dollars
+      FROM __work_orders
+      WHERE status = 'PLANNED'
+        AND risk_reduction > 0
+        AND estimated_cost > 0
+      ORDER BY risk_points_per_1000_dollars DESC
+      LIMIT 20
+
+  - name: tier_3_vegetation_priority
+    question: "Show vegetation work in Tier 3 fire districts"
+    sql: |
+      SELECT 
+        v.encroachment_id,
+        a.asset_id,
+        a.region,
+        v.species,
+        v.current_clearance_ft,
+        v.required_clearance_ft,
+        v.days_to_contact,
+        v.ignition_probability,
+        v.priority,
+        v.estimated_trim_cost
+      FROM __vegetation v
+      JOIN __assets a ON v.asset_id = a.asset_id
+      WHERE a.fire_threat_district = 'TIER_3'
+        AND v.compliance_status != 'COMPLIANT'
+      ORDER BY v.ignition_probability DESC, v.days_to_contact ASC
+      LIMIT 30
+
+# ============================================
+# CUSTOM INSTRUCTIONS
+# ============================================
+custom_instructions: >
+  This semantic model covers utility vegetation and infrastructure risk planning for the VIGIL platform.
+  
+  Key business context:
+  - Portfolio includes 5,000 utility assets across 5 regions (NorCal, SoCal, PNW, Southwest, Mountain)
+  - Fire season typically runs June-October; planning must complete high-risk work before June
+  - CPUC GO95 regulations mandate minimum vegetation clearances based on voltage and fire district
+  - Fire Threat Districts: TIER_3 (extreme), TIER_2 (elevated), TIER_1 (moderate), NON_HFTD
+  
+  Vegetation Compliance:
+  - COMPLIANT: Current clearance meets GO95 requirements
+  - AT_RISK: Will become non-compliant within 90 days based on growth rate
+  - NON_COMPLIANT: Currently below required clearance
+  - CRITICAL: Immediate safety hazard requiring emergency response
+  
+  Work Order Priorities:
+  - P1_EMERGENCY: Immediate safety hazard, same-day response
+  - P2_URGENT: Non-compliant in Tier 2/3 fire district, 7-day SLA
+  - P3_STANDARD: Scheduled maintenance, 30-day SLA
+  - P4_ROUTINE: Proactive maintenance, 90-day SLA
+  
+  IMPORTANT - "Hidden Discovery" Pattern (Water Treeing):
+  - Underground XLPE cables aged 15-25 years in high moisture areas show voltage dips correlated with rainfall
+  - This is "Water Treeing" - moisture ingress causing insulation degradation
+  - Detection: Look for cables with high rain_correlation_score (>0.6) in cable_predictions
+  - OR: Query AMI readings where rain_correlated_dip = TRUE clusters on specific assets
+  - These cables will fail catastrophically if not proactively replaced
+  - Current data shows ~150 cables with Water Treeing indicators, estimated $12M replacement cost
+  - This is NOT visible in routine inspections - only detectable via AMI data correlation!
+  
+  When analyzing risk:
+  - Always consider fire_threat_district in prioritization
+  - Calculate days to fire season (June 1) for urgency assessment
+  - Risk reduction per dollar is key metric for budget optimization
+  - Tier 3 assets in non-compliant vegetation status are highest priority

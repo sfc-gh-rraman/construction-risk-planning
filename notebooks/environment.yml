@@ -1,0 +1,17 @@
+# VIGIL Risk Planning - Snowflake ML Notebook Environment
+# For Snowpark Notebooks with ML capabilities
+
+name: vigil_ml_env
+channels:
+  - snowflake
+dependencies:
+  - python=3.10.*
+  - snowflake-ml-python
+  - snowflake-snowpark-python
+  - pandas
+  - numpy
+  - scikit-learn
+  - xgboost
+  - shap
+  - matplotlib
+  - plotly

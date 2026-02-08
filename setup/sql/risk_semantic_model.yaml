@@ -1,0 +1,244 @@
+name: risk_semantic_model
+description: VIGIL Risk Planning Semantic Model for Cortex Analyst
+tables:
+  - name: ASSETS
+    base_table: RISK_PLANNING_DB.ATOMIC.ASSET
+    description: Utility assets including poles, transformers, conductors, and underground cables
+    dimensions:
+      - name: asset_id
+        expr: ASSET_ID
+        description: Unique identifier for the asset
+      - name: asset_type
+        expr: ASSET_TYPE
+        description: Type of asset (POLE, TRANSFORMER, CONDUCTOR, UNDERGROUND_CABLE, SWITCH, FUSE, CAPACITOR)
+      - name: material
+        expr: MATERIAL
+        description: Construction material
+      - name: voltage_class
+        expr: VOLTAGE_CLASS
+        description: Voltage classification (LOW_VOLTAGE, MEDIUM_VOLTAGE, HIGH_VOLTAGE, TRANSMISSION)
+      - name: moisture_exposure
+        expr: MOISTURE_EXPOSURE
+        description: Moisture exposure level (LOW, MEDIUM, HIGH)
+      - name: wind_exposure
+        expr: WIND_EXPOSURE
+        description: Wind exposure level (LOW, MEDIUM, HIGH)
+    measures:
+      - name: asset_count
+        expr: COUNT(*)
+        description: Number of assets
+      - name: avg_condition
+        expr: AVG(CONDITION_SCORE)
+        description: Average condition score (0-1)
+      - name: avg_age
+        expr: AVG(ASSET_AGE_YEARS)
+        description: Average asset age in years
+      - name: total_replacement_cost
+        expr: SUM(REPLACEMENT_COST)
+        description: Total replacement cost in dollars
+        
+  - name: CIRCUITS
+    base_table: RISK_PLANNING_DB.ATOMIC.CIRCUIT
+    description: Electrical circuits with fire threat district classification
+    dimensions:
+      - name: circuit_id
+        expr: CIRCUIT_ID
+        description: Unique circuit identifier
+      - name: circuit_name
+        expr: CIRCUIT_NAME
+        description: Circuit name
+      - name: fire_threat_district
+        expr: FIRE_THREAT_DISTRICT
+        description: CPUC fire threat classification (TIER_1, TIER_2, TIER_3, NON_HFTD)
+      - name: psps_eligible
+        expr: PSPS_ELIGIBLE
+        description: Whether circuit is eligible for Public Safety Power Shutoff
+    measures:
+      - name: circuit_count
+        expr: COUNT(*)
+        description: Number of circuits
+      - name: total_customers
+        expr: SUM(TOTAL_CUSTOMERS)
+        description: Total customers served
+      - name: total_circuit_miles
+        expr: SUM(CIRCUIT_MILES)
+        description: Total circuit miles
+
+  - name: VEGETATION
+    base_table: RISK_PLANNING_DB.ATOMIC.VEGETATION_ENCROACHMENT
+    description: Vegetation encroachment measurements and GO95 compliance
+    dimensions:
+      - name: species
+        expr: SPECIES
+        description: Tree species
+      - name: trim_priority
+        expr: TRIM_PRIORITY
+        description: Trim priority (CRITICAL, HIGH, MEDIUM, LOW)
+      - name: tree_health
+        expr: TREE_HEALTH
+        description: Tree health status
+    measures:
+      - name: encroachment_count
+        expr: COUNT(*)
+        description: Number of encroachments
+      - name: avg_clearance
+        expr: AVG(CURRENT_CLEARANCE_FT)
+        description: Average current clearance in feet
+      - name: avg_deficit
+        expr: AVG(CASE WHEN CLEARANCE_DEFICIT_FT > 0 THEN CLEARANCE_DEFICIT_FT ELSE 0 END)
+        description: Average clearance deficit for non-compliant spans
+      - name: total_trim_cost
+        expr: SUM(ESTIMATED_TRIM_COST)
+        description: Total estimated trim cost
+
+  - name: RISK
+    base_table: RISK_PLANNING_DB.ATOMIC.RISK_ASSESSMENT
+    description: Fire risk assessments with multi-factor scoring
+    dimensions:
+      - name: risk_tier
+        expr: RISK_TIER
+        description: Risk classification (CRITICAL, HIGH, MEDIUM, LOW)
+      - name: assessment_method
+        expr: ASSESSMENT_METHOD
+        description: Assessment methodology
+    measures:
+      - name: avg_fire_risk
+        expr: AVG(FIRE_RISK_SCORE)
+        description: Average fire risk score
+      - name: avg_ignition_probability
+        expr: AVG(IGNITION_PROBABILITY)
+        description: Average ignition probability
+      - name: avg_composite_risk
+        expr: AVG(COMPOSITE_RISK_SCORE)
+        description: Average composite risk score
+
+  - name: LOCATIONS
+    base_table: RISK_PLANNING_DB.ATOMIC.LOCATION
+    description: Geographic locations for assets and circuits
+    dimensions:
+      - name: region
+        expr: REGION
+        description: Geographic region (NorCal, SoCal, PNW, Southwest, Mountain)
+      - name: county
+        expr: COUNTY
+        description: County name
+      - name: terrain_type
+        expr: TERRAIN_TYPE
+        description: Terrain classification
+      - name: land_use
+        expr: LAND_USE
+        description: Land use type
+
+  - name: WORK_ORDERS
+    base_table: RISK_PLANNING_DB.ATOMIC.WORK_ORDER
+    description: Work orders for vegetation management, asset replacement, and maintenance
+    dimensions:
+      - name: work_order_type
+        expr: WORK_ORDER_TYPE
+        description: Type of work order
+      - name: priority
+        expr: PRIORITY
+        description: Priority level (CRITICAL, HIGH, MEDIUM, LOW)
+      - name: status
+        expr: STATUS
+        description: Current status
+    measures:
+      - name: work_order_count
+        expr: COUNT(*)
+        description: Number of work orders
+      - name: total_estimated_cost
+        expr: SUM(ESTIMATED_COST)
+        description: Total estimated cost
+
+relationships:
+  - name: asset_to_circuit
+    left_table: ASSETS
+    right_table: CIRCUITS
+    join_type: many_to_one
+    relationship_columns:
+      - left_column: CIRCUIT_ID
+        right_column: CIRCUIT_ID
+        
+  - name: asset_to_location
+    left_table: ASSETS
+    right_table: LOCATIONS
+    join_type: many_to_one
+    relationship_columns:
+      - left_column: LOCATION_ID
+        right_column: LOCATION_ID
+
+  - name: vegetation_to_asset
+    left_table: VEGETATION
+    right_table: ASSETS
+    join_type: many_to_one
+    relationship_columns:
+      - left_column: ASSET_ID
+        right_column: ASSET_ID
+
+  - name: risk_to_asset
+    left_table: RISK
+    right_table: ASSETS
+    join_type: one_to_one
+    relationship_columns:
+      - left_column: ASSET_ID
+        right_column: ASSET_ID
+
+  - name: work_order_to_asset
+    left_table: WORK_ORDERS
+    right_table: ASSETS
+    join_type: many_to_one
+    relationship_columns:
+      - left_column: ASSET_ID
+        right_column: ASSET_ID
+
+verified_queries:
+  - name: assets_by_region
+    question: How many assets are in each region?
+    sql: |
+      SELECT l.REGION, COUNT(*) as ASSET_COUNT
+      FROM RISK_PLANNING_DB.ATOMIC.ASSET a
+      JOIN RISK_PLANNING_DB.ATOMIC.LOCATION l ON a.LOCATION_ID = l.LOCATION_ID
+      GROUP BY l.REGION
+      ORDER BY ASSET_COUNT DESC
+      
+  - name: high_risk_assets
+    question: What are the critical and high risk assets?
+    sql: |
+      SELECT r.RISK_TIER, a.ASSET_TYPE, COUNT(*) as COUNT
+      FROM RISK_PLANNING_DB.ATOMIC.RISK_ASSESSMENT r
+      JOIN RISK_PLANNING_DB.ATOMIC.ASSET a ON r.ASSET_ID = a.ASSET_ID
+      WHERE r.RISK_TIER IN ('CRITICAL', 'HIGH')
+      GROUP BY r.RISK_TIER, a.ASSET_TYPE
+      ORDER BY r.RISK_TIER, COUNT DESC
+      
+  - name: compliance_by_fire_district
+    question: What is the GO95 compliance status by fire threat district?
+    sql: |
+      SELECT c.FIRE_THREAT_DISTRICT,
+             COUNT(*) as TOTAL_SPANS,
+             SUM(CASE WHEN v.CURRENT_CLEARANCE_FT < v.REQUIRED_CLEARANCE_FT THEN 1 ELSE 0 END) as NON_COMPLIANT
+      FROM RISK_PLANNING_DB.ATOMIC.VEGETATION_ENCROACHMENT v
+      JOIN RISK_PLANNING_DB.ATOMIC.ASSET a ON v.ASSET_ID = a.ASSET_ID
+      JOIN RISK_PLANNING_DB.ATOMIC.CIRCUIT c ON a.CIRCUIT_ID = c.CIRCUIT_ID
+      GROUP BY c.FIRE_THREAT_DISTRICT
+      ORDER BY c.FIRE_THREAT_DISTRICT
+      
+  - name: work_order_backlog
+    question: What is the work order backlog by type and priority?
+    sql: |
+      SELECT WORK_ORDER_TYPE, PRIORITY, COUNT(*) as COUNT, SUM(ESTIMATED_COST) as TOTAL_COST
+      FROM RISK_PLANNING_DB.ATOMIC.WORK_ORDER
+      WHERE STATUS IN ('PENDING', 'SCHEDULED')
+      GROUP BY WORK_ORDER_TYPE, PRIORITY
+      ORDER BY WORK_ORDER_TYPE, PRIORITY
+
+  - name: vegetation_trim_priorities
+    question: What vegetation needs to be trimmed most urgently?
+    sql: |
+      SELECT v.SPECIES, v.TRIM_PRIORITY, COUNT(*) as COUNT, 
+             AVG(v.DAYS_TO_CONTACT) as AVG_DAYS_TO_CONTACT,
+             SUM(v.ESTIMATED_TRIM_COST) as TOTAL_TRIM_COST
+      FROM RISK_PLANNING_DB.ATOMIC.VEGETATION_ENCROACHMENT v
+      WHERE v.TRIM_PRIORITY IN ('CRITICAL', 'HIGH')
+      GROUP BY v.SPECIES, v.TRIM_PRIORITY
+      ORDER BY v.TRIM_PRIORITY, COUNT DESC

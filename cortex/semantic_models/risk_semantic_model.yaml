@@ -1,0 +1,300 @@
+# VIGIL Risk Planning - Semantic Model for Cortex Analyst
+
+name: VIGIL_RISK_MODEL
+description: |
+  Semantic model for utility vegetation management and infrastructure risk planning.
+  Supports natural language queries about asset health, vegetation compliance, 
+  fire risk, and Water Treeing detection (Hidden Discovery).
+
+tables:
+  - name: ASSET
+    description: Utility assets including poles, conductors, transformers, and underground cables
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ATOMIC
+      table: ASSET
+    primary_key:
+      columns:
+        - ASSET_ID
+    dimensions:
+      - name: ASSET_ID
+        description: Unique asset identifier
+        expr: ASSET_ID
+        data_type: VARCHAR
+      - name: CIRCUIT_ID
+        description: Associated circuit ID
+        expr: CIRCUIT_ID
+        data_type: VARCHAR
+      - name: LOCATION_ID
+        description: Geographic location ID
+        expr: LOCATION_ID
+        data_type: VARCHAR
+      - name: ASSET_TYPE
+        description: Asset type (POLE, CONDUCTOR, TRANSFORMER, SWITCH, CABLE_UNDERGROUND)
+        expr: ASSET_TYPE
+        data_type: VARCHAR
+        sample_values:
+          - POLE
+          - CONDUCTOR
+          - TRANSFORMER
+          - SWITCH
+          - CABLE_UNDERGROUND
+      - name: ASSET_SUBTYPE
+        description: Asset subtype
+        expr: ASSET_SUBTYPE
+        data_type: VARCHAR
+      - name: MATERIAL
+        description: Material type (for underground cables this is insulation - XLPE, EPR, PILC)
+        expr: MATERIAL
+        data_type: VARCHAR
+        sample_values:
+          - XLPE
+          - EPR
+          - PILC
+          - WOOD
+          - STEEL
+      - name: VOLTAGE_CLASS
+        description: Voltage class (4KV, 12KV, 21KV, 33KV, 69KV)
+        expr: VOLTAGE_CLASS
+        data_type: VARCHAR
+      - name: MOISTURE_EXPOSURE
+        description: Moisture exposure level (LOW, MEDIUM, HIGH) - key for Water Treeing analysis
+        expr: MOISTURE_EXPOSURE
+        data_type: VARCHAR
+        sample_values:
+          - LOW
+          - MEDIUM
+          - HIGH
+      - name: WIND_EXPOSURE
+        description: Wind exposure level
+        expr: WIND_EXPOSURE
+        data_type: VARCHAR
+    time_dimensions:
+      - name: INSTALLATION_DATE
+        description: Date asset was installed
+        expr: INSTALLATION_DATE
+        data_type: DATE
+      - name: LAST_INSPECTION_DATE
+        description: Date of last inspection
+        expr: LAST_INSPECTION_DATE
+        data_type: DATE
+      - name: NEXT_INSPECTION_DUE
+        description: Date next inspection is due
+        expr: NEXT_INSPECTION_DUE
+        data_type: DATE
+    measures:
+      - name: ASSET_AGE_YEARS
+        description: Asset age in years
+        expr: ASSET_AGE_YEARS
+        data_type: NUMBER
+        default_aggregation: avg
+        synonyms:
+          - age
+          - years old
+      - name: CONDITION_SCORE
+        description: Asset condition score (0-1, higher is better)
+        expr: CONDITION_SCORE
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: REPLACEMENT_COST
+        description: Estimated replacement cost in dollars
+        expr: REPLACEMENT_COST
+        data_type: NUMBER
+        default_aggregation: sum
+
+  - name: CIRCUIT
+    description: Electrical circuits/feeders with reliability metrics
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ATOMIC
+      table: CIRCUIT
+    primary_key:
+      columns:
+        - CIRCUIT_ID
+    dimensions:
+      - name: CIRCUIT_ID
+        description: Unique circuit identifier
+        expr: CIRCUIT_ID
+        data_type: VARCHAR
+      - name: CIRCUIT_NAME
+        description: Circuit name/number
+        expr: CIRCUIT_NAME
+        data_type: VARCHAR
+      - name: SUBSTATION_NAME
+        description: Serving substation name
+        expr: SUBSTATION_NAME
+        data_type: VARCHAR
+      - name: VOLTAGE_CLASS
+        description: Operating voltage class
+        expr: VOLTAGE_CLASS
+        data_type: VARCHAR
+      - name: FIRE_THREAT_DISTRICT
+        description: CPUC fire threat tier (TIER_1, TIER_2, TIER_3, NON_HFTD)
+        expr: FIRE_THREAT_DISTRICT
+        data_type: VARCHAR
+        sample_values:
+          - TIER_1
+          - TIER_2
+          - TIER_3
+          - NON_HFTD
+        synonyms:
+          - fire tier
+          - HFTD
+          - fire threat tier
+      - name: PRIMARY_LOCATION_ID
+        description: Primary location ID for the circuit
+        expr: PRIMARY_LOCATION_ID
+        data_type: VARCHAR
+      - name: PSPS_ELIGIBLE
+        description: Flag indicating PSPS eligibility
+        expr: PSPS_ELIGIBLE
+        data_type: BOOLEAN
+    measures:
+      - name: TOTAL_CUSTOMERS
+        description: Number of customers served
+        expr: TOTAL_CUSTOMERS
+        data_type: NUMBER
+        default_aggregation: sum
+        synonyms:
+          - customer count
+          - customers
+      - name: CRITICAL_FACILITIES
+        description: Number of critical facilities on circuit
+        expr: CRITICAL_FACILITIES
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: MEDICAL_BASELINE_CUSTOMERS
+        description: Number of medical baseline customers
+        expr: MEDICAL_BASELINE_CUSTOMERS
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: CIRCUIT_MILES
+        description: Total circuit miles
+        expr: CIRCUIT_MILES
+        data_type: NUMBER
+        default_aggregation: sum
+
+  - name: RISK_ASSESSMENT
+    description: ML-generated risk scores with component factors
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ATOMIC
+      table: RISK_ASSESSMENT
+    primary_key:
+      columns:
+        - ASSESSMENT_ID
+    time_dimensions:
+      - name: ASSESSMENT_DATE
+        description: Date of the risk assessment
+        expr: ASSESSMENT_DATE
+        data_type: DATE
+    dimensions:
+      - name: ASSESSMENT_ID
+        description: Unique assessment ID
+        expr: ASSESSMENT_ID
+        data_type: VARCHAR
+      - name: ASSET_ID
+        description: Assessed asset ID
+        expr: ASSET_ID
+        data_type: VARCHAR
+      - name: RISK_TIER
+        description: Risk tier (CRITICAL, HIGH, MEDIUM, LOW)
+        expr: RISK_TIER
+        data_type: VARCHAR
+        sample_values:
+          - CRITICAL
+          - HIGH
+          - MEDIUM
+          - LOW
+      - name: ASSESSED_BY
+        description: Who performed the assessment
+        expr: ASSESSED_BY
+        data_type: VARCHAR
+      - name: ASSESSMENT_METHOD
+        description: Method used for assessment
+        expr: ASSESSMENT_METHOD
+        data_type: VARCHAR
+    measures:
+      - name: COMPOSITE_RISK_SCORE
+        description: Overall risk score (0-100)
+        expr: COMPOSITE_RISK_SCORE
+        data_type: NUMBER
+        default_aggregation: avg
+        synonyms:
+          - risk score
+          - overall risk
+      - name: FIRE_RISK_SCORE
+        description: Fire risk score (0-100)
+        expr: FIRE_RISK_SCORE
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: IGNITION_PROBABILITY
+        description: Probability of ignition (0-1)
+        expr: IGNITION_PROBABILITY
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: CONSEQUENCE_SCORE
+        description: Consequence score (0-100)
+        expr: CONSEQUENCE_SCORE
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: WIND_EXPOSURE_FACTOR
+        description: Wind exposure factor
+        expr: WIND_EXPOSURE_FACTOR
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: FUEL_LOAD_FACTOR
+        description: Fuel load factor
+        expr: FUEL_LOAD_FACTOR
+        data_type: NUMBER
+        default_aggregation: avg
+
+relationships:
+  - name: asset_circuit
+    left_table: ASSET
+    right_table: CIRCUIT
+    relationship_columns:
+      - left_column: CIRCUIT_ID
+        right_column: CIRCUIT_ID
+    join_type: left_outer
+    relationship_type: many_to_one
+    
+  - name: risk_asset
+    left_table: RISK_ASSESSMENT
+    right_table: ASSET
+    relationship_columns:
+      - left_column: ASSET_ID
+        right_column: ASSET_ID
+    join_type: left_outer
+    relationship_type: many_to_one
+
+verified_queries:
+  - name: asset_count
+    question: "How many assets do we have?"
+    sql: "SELECT COUNT(*) as ASSET_COUNT FROM RISK_PLANNING_DB.ATOMIC.ASSET"
+    verified_at: 1705334400
+    verified_by: VIGIL
+
+  - name: high_risk_assets
+    question: "Show me high risk assets"
+    sql: "SELECT a.ASSET_ID, a.ASSET_TYPE, a.ASSET_AGE_YEARS, r.COMPOSITE_RISK_SCORE, r.RISK_TIER FROM RISK_PLANNING_DB.ATOMIC.ASSET a JOIN RISK_PLANNING_DB.ATOMIC.RISK_ASSESSMENT r ON a.ASSET_ID = r.ASSET_ID WHERE r.RISK_TIER IN ('CRITICAL', 'HIGH') ORDER BY r.COMPOSITE_RISK_SCORE DESC LIMIT 50"
+    verified_at: 1705334400
+    verified_by: VIGIL
+
+  - name: tier3_fire_assets
+    question: "Show me assets in Tier 3 fire districts"
+    sql: "SELECT a.ASSET_ID, a.ASSET_TYPE, c.CIRCUIT_NAME, c.FIRE_THREAT_DISTRICT FROM RISK_PLANNING_DB.ATOMIC.ASSET a JOIN RISK_PLANNING_DB.ATOMIC.CIRCUIT c ON a.CIRCUIT_ID = c.CIRCUIT_ID WHERE c.FIRE_THREAT_DISTRICT = 'TIER_3' LIMIT 100"
+    verified_at: 1705334400
+    verified_by: VIGIL
+
+  - name: water_treeing_candidates
+    question: "Find underground cables with water treeing indicators"
+    sql: "SELECT ASSET_ID, ASSET_TYPE, MATERIAL, MOISTURE_EXPOSURE, ASSET_AGE_YEARS FROM RISK_PLANNING_DB.ATOMIC.ASSET WHERE ASSET_TYPE = 'CABLE_UNDERGROUND' AND MATERIAL = 'XLPE' AND MOISTURE_EXPOSURE = 'HIGH' ORDER BY ASSET_AGE_YEARS DESC LIMIT 100"
+    verified_at: 1705334400
+    verified_by: VIGIL
+
+  - name: critical_customers_at_risk
+    question: "Show circuits with most customers at risk in Tier 3"
+    sql: "SELECT c.CIRCUIT_NAME, c.FIRE_THREAT_DISTRICT, c.TOTAL_CUSTOMERS, c.CRITICAL_FACILITIES FROM RISK_PLANNING_DB.ATOMIC.CIRCUIT c WHERE c.FIRE_THREAT_DISTRICT = 'TIER_3' ORDER BY c.TOTAL_CUSTOMERS DESC LIMIT 50"
+    verified_at: 1705334400
+    verified_by: VIGIL
