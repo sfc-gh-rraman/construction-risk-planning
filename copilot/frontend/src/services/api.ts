@@ -95,6 +95,12 @@ export const getIgnitionRiskPredictions = (limit = 100) =>
   fetchAPI(`/ml/ignition-risk?limit=${limit}`);
 export const getCableFailurePredictions = (limit = 100) =>
   fetchAPI(`/ml/cable-failure?limit=${limit}`);
+export const getCombinedRiskSummary = (limit = 100) =>
+  fetchAPI(`/ml/combined-risk?limit=${limit}`);
+export const getCombinedRiskByRegion = () =>
+  fetchAPI('/ml/combined-risk/by-region');
+export const getUrgentMLActions = (limit = 50) =>
+  fetchAPI(`/ml/urgent-actions?limit=${limit}`);
 
 // Search
 export const searchGO95 = (query: string) => 

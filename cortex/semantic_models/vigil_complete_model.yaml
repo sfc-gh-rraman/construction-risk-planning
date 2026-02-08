@@ -1,0 +1,1293 @@
+# VIGIL Risk Planning - Complete Semantic Model for Cortex Analyst
+# Enhanced with ML Predictions, Full Entity Relationships, and Verified Queries
+
+name: VIGIL_COMPLETE_MODEL
+description: |
+  Comprehensive semantic model for utility vegetation management and infrastructure risk planning.
+  Integrates source data with ML predictions for holistic asset risk analysis.
+  
+  KEY CAPABILITIES:
+  - Asset health monitoring and degradation prediction
+  - Wildfire ignition risk classification
+  - Vegetation growth forecasting and trim scheduling
+  - Water Treeing detection in underground cables (Hidden Discovery)
+  - Cross-entity risk correlation analysis
+
+# =============================================================================
+# SOURCE DATA TABLES
+# =============================================================================
+
+tables:
+  # ---------------------------------------------------------------------------
+  # LOCATION - Geographic reference for all entities
+  # ---------------------------------------------------------------------------
+  - name: LOCATION
+    description: Geographic locations with region, county, and coordinates for spatial analysis
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ATOMIC
+      table: LOCATION
+    primary_key:
+      columns:
+        - LOCATION_ID
+    dimensions:
+      - name: LOCATION_ID
+        description: Unique location identifier
+        expr: LOCATION_ID
+        data_type: VARCHAR
+      - name: REGION
+        description: Operating region (Bay Area, Central Valley, Sierra Foothills, North Coast, South Coast)
+        expr: REGION
+        data_type: VARCHAR
+        sample_values:
+          - Bay Area
+          - Central Valley
+          - Sierra Foothills
+          - North Coast
+          - South Coast
+        synonyms:
+          - area
+          - territory
+          - district
+      - name: COUNTY
+        description: County name
+        expr: COUNTY
+        data_type: VARCHAR
+      - name: CITY
+        description: City name
+        expr: CITY
+        data_type: VARCHAR
+      - name: ZIP_CODE
+        description: ZIP code
+        expr: ZIP_CODE
+        data_type: VARCHAR
+    measures:
+      - name: LATITUDE
+        description: Latitude coordinate
+        expr: LATITUDE
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: LONGITUDE
+        description: Longitude coordinate
+        expr: LONGITUDE
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: ELEVATION_FT
+        description: Elevation in feet
+        expr: ELEVATION_FT
+        data_type: NUMBER
+        default_aggregation: avg
+
+  # ---------------------------------------------------------------------------
+  # CIRCUIT - Electrical circuits with fire threat classification
+  # ---------------------------------------------------------------------------
+  - name: CIRCUIT
+    description: Electrical circuits/feeders with reliability metrics and fire threat district classification
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ATOMIC
+      table: CIRCUIT
+    primary_key:
+      columns:
+        - CIRCUIT_ID
+    dimensions:
+      - name: CIRCUIT_ID
+        description: Unique circuit identifier
+        expr: CIRCUIT_ID
+        data_type: VARCHAR
+      - name: CIRCUIT_NAME
+        description: Circuit name/number
+        expr: CIRCUIT_NAME
+        data_type: VARCHAR
+      - name: SUBSTATION_NAME
+        description: Serving substation name
+        expr: SUBSTATION_NAME
+        data_type: VARCHAR
+      - name: VOLTAGE_CLASS
+        description: Operating voltage class
+        expr: VOLTAGE_CLASS
+        data_type: VARCHAR
+      - name: FIRE_THREAT_DISTRICT
+        description: CPUC fire threat tier (TIER_1, TIER_2, TIER_3, NON_HFTD). TIER_3 is highest risk.
+        expr: FIRE_THREAT_DISTRICT
+        data_type: VARCHAR
+        sample_values:
+          - TIER_1
+          - TIER_2
+          - TIER_3
+          - NON_HFTD
+        synonyms:
+          - fire tier
+          - HFTD
+          - fire threat tier
+          - high fire threat district
+      - name: PRIMARY_LOCATION_ID
+        description: Primary location ID for the circuit
+        expr: PRIMARY_LOCATION_ID
+        data_type: VARCHAR
+      - name: PSPS_ELIGIBLE
+        description: Flag indicating Public Safety Power Shutoff eligibility
+        expr: PSPS_ELIGIBLE
+        data_type: BOOLEAN
+        synonyms:
+          - power shutoff eligible
+          - PSPS
+    measures:
+      - name: TOTAL_CUSTOMERS
+        description: Number of customers served by this circuit
+        expr: TOTAL_CUSTOMERS
+        data_type: NUMBER
+        default_aggregation: sum
+        synonyms:
+          - customer count
+          - customers
+      - name: CRITICAL_FACILITIES
+        description: Number of critical facilities (hospitals, fire stations, etc.) on circuit
+        expr: CRITICAL_FACILITIES
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: MEDICAL_BASELINE_CUSTOMERS
+        description: Number of medical baseline customers requiring continuous power
+        expr: MEDICAL_BASELINE_CUSTOMERS
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: CIRCUIT_MILES
+        description: Total circuit miles
+        expr: CIRCUIT_MILES
+        data_type: NUMBER
+        default_aggregation: sum
+
+  # ---------------------------------------------------------------------------
+  # ASSET - Utility infrastructure assets
+  # ---------------------------------------------------------------------------
+  - name: ASSET
+    description: Utility assets including poles, conductors, transformers, switches, and underground cables
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ATOMIC
+      table: ASSET
+    primary_key:
+      columns:
+        - ASSET_ID
+    dimensions:
+      - name: ASSET_ID
+        description: Unique asset identifier
+        expr: ASSET_ID
+        data_type: VARCHAR
+      - name: CIRCUIT_ID
+        description: Associated circuit ID (foreign key to CIRCUIT)
+        expr: CIRCUIT_ID
+        data_type: VARCHAR
+      - name: LOCATION_ID
+        description: Geographic location ID (foreign key to LOCATION)
+        expr: LOCATION_ID
+        data_type: VARCHAR
+      - name: ASSET_TYPE
+        description: Type of asset - POLE, CONDUCTOR, TRANSFORMER, SWITCH, or UNDERGROUND_CABLE
+        expr: ASSET_TYPE
+        data_type: VARCHAR
+        sample_values:
+          - POLE
+          - CONDUCTOR
+          - TRANSFORMER
+          - SWITCH
+          - UNDERGROUND_CABLE
+        synonyms:
+          - equipment type
+          - infrastructure type
+      - name: ASSET_SUBTYPE
+        description: Asset subtype for detailed classification
+        expr: ASSET_SUBTYPE
+        data_type: VARCHAR
+      - name: MATERIAL
+        description: Material type. For underground cables - XLPE, EPR, PILC (insulation types critical for Water Treeing analysis)
+        expr: MATERIAL
+        data_type: VARCHAR
+        sample_values:
+          - XLPE
+          - EPR
+          - PILC
+          - WOOD
+          - STEEL
+          - ALUMINUM
+      - name: VOLTAGE_CLASS
+        description: Voltage class (4KV, 12KV, 21KV, 33KV, 69KV)
+        expr: VOLTAGE_CLASS
+        data_type: VARCHAR
+      - name: MOISTURE_EXPOSURE
+        description: Moisture exposure level (LOW, MEDIUM, HIGH) - key indicator for Water Treeing risk in cables
+        expr: MOISTURE_EXPOSURE
+        data_type: VARCHAR
+        sample_values:
+          - LOW
+          - MEDIUM
+          - HIGH
+        synonyms:
+          - water exposure
+          - humidity exposure
+      - name: WIND_EXPOSURE
+        description: Wind exposure level affecting vegetation contact risk
+        expr: WIND_EXPOSURE
+        data_type: VARCHAR
+    time_dimensions:
+      - name: INSTALLATION_DATE
+        description: Date asset was installed
+        expr: INSTALLATION_DATE
+        data_type: DATE
+      - name: LAST_INSPECTION_DATE
+        description: Date of last inspection
+        expr: LAST_INSPECTION_DATE
+        data_type: DATE
+      - name: NEXT_INSPECTION_DUE
+        description: Date next inspection is due
+        expr: NEXT_INSPECTION_DUE
+        data_type: DATE
+    measures:
+      - name: ASSET_AGE_YEARS
+        description: Asset age in years since installation
+        expr: ASSET_AGE_YEARS
+        data_type: NUMBER
+        default_aggregation: avg
+        synonyms:
+          - age
+          - years old
+          - asset age
+      - name: CONDITION_SCORE
+        description: Asset condition score (0-1, higher is better). Below 0.4 is poor condition.
+        expr: CONDITION_SCORE
+        data_type: NUMBER
+        default_aggregation: avg
+        synonyms:
+          - health score
+          - condition
+      - name: REPLACEMENT_COST
+        description: Estimated replacement cost in dollars
+        expr: REPLACEMENT_COST
+        data_type: NUMBER
+        default_aggregation: sum
+
+  # ---------------------------------------------------------------------------
+  # VEGETATION_ENCROACHMENT - Vegetation clearance and compliance
+  # ---------------------------------------------------------------------------
+  - name: VEGETATION_ENCROACHMENT
+    description: Vegetation encroachment measurements, growth rates, and GO95 compliance status for utility clearances
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ATOMIC
+      table: VEGETATION_ENCROACHMENT
+    primary_key:
+      columns:
+        - ENCROACHMENT_ID
+    dimensions:
+      - name: ENCROACHMENT_ID
+        description: Unique encroachment record identifier
+        expr: ENCROACHMENT_ID
+        data_type: VARCHAR
+      - name: ASSET_ID
+        description: Associated asset ID (foreign key to ASSET)
+        expr: ASSET_ID
+        data_type: VARCHAR
+      - name: SPECIES
+        description: Tree species (EUCALYPTUS, OAK, PINE, PALM, WILLOW, etc.)
+        expr: SPECIES
+        data_type: VARCHAR
+        sample_values:
+          - EUCALYPTUS
+          - OAK
+          - PINE
+          - PALM
+          - WILLOW
+          - JUNIPER
+      - name: TREE_HEALTH
+        description: Tree health status (HEALTHY, STRESSED, DEAD, DISEASED)
+        expr: TREE_HEALTH
+        data_type: VARCHAR
+      - name: TRIM_PRIORITY
+        description: Trimming priority (CRITICAL, HIGH, MEDIUM, LOW)
+        expr: TRIM_PRIORITY
+        data_type: VARCHAR
+        sample_values:
+          - CRITICAL
+          - HIGH
+          - MEDIUM
+          - LOW
+      - name: GO95_COMPLIANT
+        description: California GO95 regulation compliance status
+        expr: GO95_COMPLIANT
+        data_type: BOOLEAN
+        synonyms:
+          - compliant
+          - in compliance
+    time_dimensions:
+      - name: INSPECTION_DATE
+        description: Date of vegetation inspection
+        expr: INSPECTION_DATE
+        data_type: DATE
+      - name: LAST_TRIM_DATE
+        description: Date of last trimming
+        expr: LAST_TRIM_DATE
+        data_type: DATE
+    measures:
+      - name: CURRENT_CLEARANCE_FT
+        description: Current clearance from conductor in feet
+        expr: CURRENT_CLEARANCE_FT
+        data_type: NUMBER
+        default_aggregation: avg
+        synonyms:
+          - clearance
+          - distance
+      - name: REQUIRED_CLEARANCE_FT
+        description: Required minimum clearance per GO95
+        expr: REQUIRED_CLEARANCE_FT
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: CLEARANCE_DEFICIT_FT
+        description: Clearance deficit (negative means out of compliance)
+        expr: CLEARANCE_DEFICIT_FT
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: TREE_HEIGHT_FT
+        description: Total tree height in feet
+        expr: TREE_HEIGHT_FT
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: GROWTH_RATE_FT_YEAR
+        description: Annual growth rate in feet per year
+        expr: GROWTH_RATE_FT_YEAR
+        data_type: NUMBER
+        default_aggregation: avg
+        synonyms:
+          - growth rate
+          - annual growth
+      - name: ESTIMATED_TRIM_COST
+        description: Estimated cost to trim this vegetation
+        expr: ESTIMATED_TRIM_COST
+        data_type: NUMBER
+        default_aggregation: sum
+
+  # ---------------------------------------------------------------------------
+  # AMI_READING - Smart meter voltage readings for cable analysis
+  # ---------------------------------------------------------------------------
+  - name: AMI_READING
+    description: AMI (Advanced Metering Infrastructure) voltage readings used for Water Treeing detection. Rain-correlated voltage dips indicate cable insulation degradation.
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ATOMIC
+      table: AMI_READING
+    primary_key:
+      columns:
+        - READING_ID
+    dimensions:
+      - name: READING_ID
+        description: Unique reading identifier
+        expr: READING_ID
+        data_type: VARCHAR
+      - name: ASSET_ID
+        description: Associated underground cable asset ID
+        expr: ASSET_ID
+        data_type: VARCHAR
+      - name: VOLTAGE_DIP_FLAG
+        description: Flag indicating a significant voltage dip occurred
+        expr: VOLTAGE_DIP_FLAG
+        data_type: BOOLEAN
+        synonyms:
+          - voltage drop
+          - dip detected
+      - name: RAIN_CORRELATED_DIP
+        description: Flag indicating voltage dip correlated with rainfall - key Water Treeing indicator
+        expr: RAIN_CORRELATED_DIP
+        data_type: BOOLEAN
+        synonyms:
+          - rain dip
+          - moisture correlated
+    time_dimensions:
+      - name: READING_TIMESTAMP
+        description: Timestamp of the reading
+        expr: READING_TIMESTAMP
+        data_type: TIMESTAMP
+    measures:
+      - name: VOLTAGE_READING
+        description: Voltage reading value
+        expr: VOLTAGE_READING
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: CURRENT_READING
+        description: Current reading in amps
+        expr: CURRENT_READING
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: POWER_FACTOR
+        description: Power factor measurement
+        expr: POWER_FACTOR
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: RAINFALL_24H_INCHES
+        description: Rainfall in previous 24 hours (inches)
+        expr: RAINFALL_24H_INCHES
+        data_type: NUMBER
+        default_aggregation: avg
+
+  # ---------------------------------------------------------------------------
+  # RISK_ASSESSMENT - Historical risk assessments
+  # ---------------------------------------------------------------------------
+  - name: RISK_ASSESSMENT
+    description: Risk assessments with multi-factor scoring for fire risk, ignition probability, and consequence analysis
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ATOMIC
+      table: RISK_ASSESSMENT
+    primary_key:
+      columns:
+        - ASSESSMENT_ID
+    dimensions:
+      - name: ASSESSMENT_ID
+        description: Unique assessment ID
+        expr: ASSESSMENT_ID
+        data_type: VARCHAR
+      - name: ASSET_ID
+        description: Assessed asset ID (foreign key to ASSET)
+        expr: ASSET_ID
+        data_type: VARCHAR
+      - name: RISK_TIER
+        description: Risk tier classification (CRITICAL, HIGH, MEDIUM, LOW)
+        expr: RISK_TIER
+        data_type: VARCHAR
+        sample_values:
+          - CRITICAL
+          - HIGH
+          - MEDIUM
+          - LOW
+        synonyms:
+          - risk level
+          - risk category
+      - name: ASSESSED_BY
+        description: Who performed the assessment
+        expr: ASSESSED_BY
+        data_type: VARCHAR
+      - name: ASSESSMENT_METHOD
+        description: Method used for assessment (FIELD_INSPECTION, ML_MODEL, REMOTE_SENSING)
+        expr: ASSESSMENT_METHOD
+        data_type: VARCHAR
+    time_dimensions:
+      - name: ASSESSMENT_DATE
+        description: Date of the risk assessment
+        expr: ASSESSMENT_DATE
+        data_type: DATE
+    measures:
+      - name: COMPOSITE_RISK_SCORE
+        description: Overall composite risk score (0-100, higher is riskier)
+        expr: COMPOSITE_RISK_SCORE
+        data_type: NUMBER
+        default_aggregation: avg
+        synonyms:
+          - risk score
+          - overall risk
+      - name: FIRE_RISK_SCORE
+        description: Fire-specific risk score (0-100)
+        expr: FIRE_RISK_SCORE
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: IGNITION_PROBABILITY
+        description: Probability of causing ignition (0-1)
+        expr: IGNITION_PROBABILITY
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: CONSEQUENCE_SCORE
+        description: Consequence severity score (0-100)
+        expr: CONSEQUENCE_SCORE
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: WIND_EXPOSURE_FACTOR
+        description: Wind exposure contribution factor
+        expr: WIND_EXPOSURE_FACTOR
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: FUEL_LOAD_FACTOR
+        description: Surrounding fuel load contribution factor
+        expr: FUEL_LOAD_FACTOR
+        data_type: NUMBER
+        default_aggregation: avg
+
+  # ---------------------------------------------------------------------------
+  # WEATHER_DATA - Weather observations
+  # ---------------------------------------------------------------------------
+  - name: WEATHER_DATA
+    description: Weather observations for fire risk assessment and correlation analysis
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ATOMIC
+      table: WEATHER_DATA
+    primary_key:
+      columns:
+        - WEATHER_ID
+    dimensions:
+      - name: WEATHER_ID
+        description: Unique weather record identifier
+        expr: WEATHER_ID
+        data_type: VARCHAR
+      - name: LOCATION_ID
+        description: Location ID (foreign key to LOCATION)
+        expr: LOCATION_ID
+        data_type: VARCHAR
+      - name: RED_FLAG_WARNING
+        description: NWS Red Flag Warning active
+        expr: RED_FLAG_WARNING
+        data_type: BOOLEAN
+        synonyms:
+          - fire weather warning
+          - red flag
+      - name: FIRE_WEATHER_WATCH
+        description: Fire weather watch active
+        expr: FIRE_WEATHER_WATCH
+        data_type: BOOLEAN
+    time_dimensions:
+      - name: OBSERVATION_TIME
+        description: Time of weather observation
+        expr: OBSERVATION_TIME
+        data_type: TIMESTAMP
+    measures:
+      - name: TEMPERATURE_F
+        description: Temperature in Fahrenheit
+        expr: TEMPERATURE_F
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: HUMIDITY_PCT
+        description: Relative humidity percentage
+        expr: HUMIDITY_PCT
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: WIND_SPEED_MPH
+        description: Wind speed in MPH
+        expr: WIND_SPEED_MPH
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: WIND_GUST_MPH
+        description: Wind gust speed in MPH
+        expr: WIND_GUST_MPH
+        data_type: NUMBER
+        default_aggregation: max
+      - name: PRECIPITATION_IN
+        description: Precipitation in inches
+        expr: PRECIPITATION_IN
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: FIRE_WEATHER_INDEX
+        description: Calculated fire weather index (0-100)
+        expr: FIRE_WEATHER_INDEX
+        data_type: NUMBER
+        default_aggregation: avg
+        synonyms:
+          - FWI
+          - fire index
+
+  # ---------------------------------------------------------------------------
+  # WORK_ORDER - Maintenance work orders
+  # ---------------------------------------------------------------------------
+  - name: WORK_ORDER
+    description: Work orders for vegetation management, asset maintenance, replacement, and emergency repairs
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ATOMIC
+      table: WORK_ORDER
+    primary_key:
+      columns:
+        - WORK_ORDER_ID
+    dimensions:
+      - name: WORK_ORDER_ID
+        description: Unique work order identifier
+        expr: WORK_ORDER_ID
+        data_type: VARCHAR
+      - name: ASSET_ID
+        description: Associated asset ID
+        expr: ASSET_ID
+        data_type: VARCHAR
+      - name: WORK_TYPE
+        description: Type of work (VEGETATION_TRIM, INSPECTION, REPLACEMENT, REPAIR, EMERGENCY)
+        expr: WORK_TYPE
+        data_type: VARCHAR
+        sample_values:
+          - VEGETATION_TRIM
+          - INSPECTION
+          - REPLACEMENT
+          - REPAIR
+          - EMERGENCY
+      - name: STATUS
+        description: Work order status (OPEN, IN_PROGRESS, COMPLETED, CANCELLED)
+        expr: STATUS
+        data_type: VARCHAR
+        sample_values:
+          - OPEN
+          - IN_PROGRESS
+          - COMPLETED
+          - CANCELLED
+      - name: PRIORITY
+        description: Priority level (EMERGENCY, HIGH, MEDIUM, LOW)
+        expr: PRIORITY
+        data_type: VARCHAR
+        sample_values:
+          - EMERGENCY
+          - HIGH
+          - MEDIUM
+          - LOW
+      - name: ASSIGNED_CREW
+        description: Assigned work crew
+        expr: ASSIGNED_CREW
+        data_type: VARCHAR
+    time_dimensions:
+      - name: CREATED_DATE
+        description: Date work order was created
+        expr: CREATED_DATE
+        data_type: DATE
+      - name: SCHEDULED_DATE
+        description: Scheduled completion date
+        expr: SCHEDULED_DATE
+        data_type: DATE
+      - name: COMPLETED_DATE
+        description: Actual completion date
+        expr: COMPLETED_DATE
+        data_type: DATE
+    measures:
+      - name: ESTIMATED_COST
+        description: Estimated cost in dollars
+        expr: ESTIMATED_COST
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: ACTUAL_COST
+        description: Actual cost in dollars
+        expr: ACTUAL_COST
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: ESTIMATED_HOURS
+        description: Estimated labor hours
+        expr: ESTIMATED_HOURS
+        data_type: NUMBER
+        default_aggregation: sum
+
+# =============================================================================
+# ML PREDICTION TABLES
+# =============================================================================
+
+  # ---------------------------------------------------------------------------
+  # ASSET_HEALTH_PREDICTION - ML predictions for asset degradation
+  # ---------------------------------------------------------------------------
+  - name: ASSET_HEALTH_PREDICTION
+    description: |
+      ML predictions for asset health and degradation using Gradient Boosting model.
+      Predicts condition scores and identifies assets trending toward failure.
+      Model: GRADIENT_BOOSTING_V1
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ML
+      table: ASSET_HEALTH_PREDICTION
+    primary_key:
+      columns:
+        - PREDICTION_ID
+    dimensions:
+      - name: PREDICTION_ID
+        description: Unique prediction identifier
+        expr: PREDICTION_ID
+        data_type: VARCHAR
+      - name: ASSET_ID
+        description: Asset being predicted (foreign key to ASSET)
+        expr: ASSET_ID
+        data_type: VARCHAR
+      - name: ASSET_TYPE
+        description: Type of asset
+        expr: ASSET_TYPE
+        data_type: VARCHAR
+      - name: PREDICTED_CONDITION
+        description: Predicted condition category (CRITICAL, POOR, FAIR, GOOD)
+        expr: PREDICTED_CONDITION
+        data_type: VARCHAR
+        sample_values:
+          - CRITICAL
+          - POOR
+          - FAIR
+          - GOOD
+        synonyms:
+          - health category
+          - condition status
+      - name: MODEL_VERSION
+        description: ML model version used
+        expr: MODEL_VERSION
+        data_type: VARCHAR
+    time_dimensions:
+      - name: PREDICTION_DATE
+        description: Date prediction was generated
+        expr: PREDICTION_DATE
+        data_type: DATE
+    measures:
+      - name: ACTUAL_HEALTH_SCORE
+        description: Actual health score from source data (0-1)
+        expr: ACTUAL_HEALTH_SCORE
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: PREDICTED_HEALTH_SCORE
+        description: ML predicted health score (0-1, higher is healthier)
+        expr: PREDICTED_HEALTH_SCORE
+        data_type: NUMBER
+        default_aggregation: avg
+        synonyms:
+          - predicted health
+          - forecast health
+      - name: HEALTH_DELTA
+        description: Difference between actual and predicted (negative = degrading faster than expected)
+        expr: HEALTH_DELTA
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: MODEL_CONFIDENCE
+        description: Model confidence score (0-1)
+        expr: MODEL_CONFIDENCE
+        data_type: NUMBER
+        default_aggregation: avg
+
+  # ---------------------------------------------------------------------------
+  # IGNITION_RISK_PREDICTION - ML classification for wildfire ignition
+  # ---------------------------------------------------------------------------
+  - name: IGNITION_RISK_PREDICTION
+    description: |
+      ML classification of wildfire ignition risk using Gradient Boosting classifier.
+      Combines asset condition with vegetation encroachment patterns.
+      Model: GRADIENT_BOOSTING_V1
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ML
+      table: IGNITION_RISK_PREDICTION
+    primary_key:
+      columns:
+        - PREDICTION_ID
+    dimensions:
+      - name: PREDICTION_ID
+        description: Unique prediction identifier
+        expr: PREDICTION_ID
+        data_type: VARCHAR
+      - name: ASSET_ID
+        description: Asset being predicted (foreign key to ASSET)
+        expr: ASSET_ID
+        data_type: VARCHAR
+      - name: ASSET_TYPE
+        description: Type of asset
+        expr: ASSET_TYPE
+        data_type: VARCHAR
+      - name: RISK_LEVEL
+        description: Predicted ignition risk level (HIGH, MEDIUM, LOW)
+        expr: RISK_LEVEL
+        data_type: VARCHAR
+        sample_values:
+          - HIGH
+          - MEDIUM
+          - LOW
+        synonyms:
+          - ignition risk
+          - fire start risk
+      - name: MODEL_VERSION
+        description: ML model version used
+        expr: MODEL_VERSION
+        data_type: VARCHAR
+    time_dimensions:
+      - name: PREDICTION_DATE
+        description: Date prediction was generated
+        expr: PREDICTION_DATE
+        data_type: DATE
+    measures:
+      - name: ACTUAL_RISK
+        description: Actual risk flag (1 = ignition event occurred)
+        expr: ACTUAL_RISK
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: PREDICTED_IGNITION_RISK
+        description: Predicted ignition risk (0 or 1)
+        expr: PREDICTED_IGNITION_RISK
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: CONDITION_SCORE
+        description: Asset condition score used in prediction
+        expr: CONDITION_SCORE
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: AVG_CLEARANCE_DEFICIT
+        description: Average vegetation clearance deficit for this asset
+        expr: AVG_CLEARANCE_DEFICIT
+        data_type: NUMBER
+        default_aggregation: avg
+
+  # ---------------------------------------------------------------------------
+  # VEGETATION_GROWTH_PREDICTION - ML forecast for vegetation growth
+  # ---------------------------------------------------------------------------
+  - name: VEGETATION_GROWTH_PREDICTION
+    description: |
+      ML forecast of vegetation growth rates and time-to-contact using Random Forest model.
+      Enables proactive trim scheduling before compliance violations.
+      Model: RANDOM_FOREST_V1
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ML
+      table: VEGETATION_GROWTH_PREDICTION
+    primary_key:
+      columns:
+        - PREDICTION_ID
+    dimensions:
+      - name: PREDICTION_ID
+        description: Unique prediction identifier
+        expr: PREDICTION_ID
+        data_type: VARCHAR
+      - name: ENCROACHMENT_ID
+        description: Vegetation encroachment record (foreign key to VEGETATION_ENCROACHMENT)
+        expr: ENCROACHMENT_ID
+        data_type: VARCHAR
+      - name: ASSET_ID
+        description: Associated asset (foreign key to ASSET)
+        expr: ASSET_ID
+        data_type: VARCHAR
+      - name: SPECIES
+        description: Tree species
+        expr: SPECIES
+        data_type: VARCHAR
+      - name: GROWTH_RISK
+        description: Growth risk level based on days to contact (HIGH, MEDIUM, LOW)
+        expr: GROWTH_RISK
+        data_type: VARCHAR
+        sample_values:
+          - HIGH
+          - MEDIUM
+          - LOW
+        synonyms:
+          - trim urgency
+          - vegetation risk
+      - name: MODEL_VERSION
+        description: ML model version used
+        expr: MODEL_VERSION
+        data_type: VARCHAR
+    time_dimensions:
+      - name: PREDICTION_DATE
+        description: Date prediction was generated
+        expr: PREDICTION_DATE
+        data_type: DATE
+    measures:
+      - name: ACTUAL_GROWTH_RATE
+        description: Actual measured growth rate (ft/year)
+        expr: ACTUAL_GROWTH_RATE
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: PREDICTED_GROWTH_RATE
+        description: ML predicted growth rate (ft/year)
+        expr: PREDICTED_GROWTH_RATE
+        data_type: NUMBER
+        default_aggregation: avg
+        synonyms:
+          - forecast growth
+          - expected growth
+      - name: CURRENT_CLEARANCE_FT
+        description: Current clearance in feet
+        expr: CURRENT_CLEARANCE_FT
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: PREDICTED_DAYS_TO_CONTACT
+        description: Predicted days until vegetation contacts conductor
+        expr: PREDICTED_DAYS_TO_CONTACT
+        data_type: NUMBER
+        default_aggregation: min
+        synonyms:
+          - days to contact
+          - time to trim
+          - urgency
+
+  # ---------------------------------------------------------------------------
+  # CABLE_FAILURE_PREDICTION - Water Treeing detection (Hidden Discovery)
+  # ---------------------------------------------------------------------------
+  - name: CABLE_FAILURE_PREDICTION
+    description: |
+      Water Treeing detection in underground cables using AMI voltage-rain correlation analysis.
+      This is the HIDDEN DISCOVERY feature - detecting cable insulation degradation before failure.
+      Key insight: Voltage dips that correlate with rainfall indicate moisture ingress into cable insulation.
+      Model: WATER_TREEING_V1
+    base_table:
+      database: RISK_PLANNING_DB
+      schema: ML
+      table: CABLE_FAILURE_PREDICTION
+    primary_key:
+      columns:
+        - PREDICTION_ID
+    dimensions:
+      - name: PREDICTION_ID
+        description: Unique prediction identifier
+        expr: PREDICTION_ID
+        data_type: VARCHAR
+      - name: ASSET_ID
+        description: Underground cable asset (foreign key to ASSET)
+        expr: ASSET_ID
+        data_type: VARCHAR
+      - name: MATERIAL
+        description: Cable insulation material (XLPE most susceptible to water treeing)
+        expr: MATERIAL
+        data_type: VARCHAR
+        sample_values:
+          - XLPE
+          - EPR
+          - PILC
+      - name: MOISTURE_EXPOSURE
+        description: Moisture exposure level
+        expr: MOISTURE_EXPOSURE
+        data_type: VARCHAR
+      - name: RISK_LEVEL
+        description: Water treeing risk level (HIGH, MEDIUM, LOW)
+        expr: RISK_LEVEL
+        data_type: VARCHAR
+        sample_values:
+          - HIGH
+          - MEDIUM
+          - LOW
+        synonyms:
+          - water treeing risk
+          - cable failure risk
+      - name: MODEL_VERSION
+        description: ML model version used
+        expr: MODEL_VERSION
+        data_type: VARCHAR
+    time_dimensions:
+      - name: PREDICTION_DATE
+        description: Date prediction was generated
+        expr: PREDICTION_DATE
+        data_type: DATE
+    measures:
+      - name: ASSET_AGE_YEARS
+        description: Cable age in years
+        expr: ASSET_AGE_YEARS
+        data_type: NUMBER
+        default_aggregation: avg
+      - name: RAIN_CORRELATED_DIPS
+        description: Count of voltage dips correlated with rainfall
+        expr: RAIN_CORRELATED_DIPS
+        data_type: NUMBER
+        default_aggregation: sum
+        synonyms:
+          - moisture dips
+          - rain dips
+      - name: RAIN_VOLTAGE_CORRELATION
+        description: Correlation coefficient between rainfall and voltage (-1 to 1, negative indicates water treeing)
+        expr: RAIN_VOLTAGE_CORRELATION
+        data_type: NUMBER
+        default_aggregation: avg
+        synonyms:
+          - voltage rain correlation
+          - water treeing indicator
+      - name: ACTUAL_RISK
+        description: Actual failure flag
+        expr: ACTUAL_RISK
+        data_type: NUMBER
+        default_aggregation: sum
+      - name: PREDICTED_WATER_TREEING
+        description: Predicted water treeing presence (0 or 1)
+        expr: PREDICTED_WATER_TREEING
+        data_type: NUMBER
+        default_aggregation: sum
+
+# =============================================================================
+# RELATIONSHIPS
+# =============================================================================
+
+relationships:
+  # Source table relationships
+  - name: asset_to_circuit
+    left_table: ASSET
+    right_table: CIRCUIT
+    relationship_columns:
+      - left_column: CIRCUIT_ID
+        right_column: CIRCUIT_ID
+    join_type: left_outer
+    relationship_type: many_to_one
+    
+  - name: asset_to_location
+    left_table: ASSET
+    right_table: LOCATION
+    relationship_columns:
+      - left_column: LOCATION_ID
+        right_column: LOCATION_ID
+    join_type: left_outer
+    relationship_type: many_to_one
+
+  - name: circuit_to_location
+    left_table: CIRCUIT
+    right_table: LOCATION
+    relationship_columns:
+      - left_column: PRIMARY_LOCATION_ID
+        right_column: LOCATION_ID
+    join_type: left_outer
+    relationship_type: many_to_one
+
+  - name: vegetation_to_asset
+    left_table: VEGETATION_ENCROACHMENT
+    right_table: ASSET
+    relationship_columns:
+      - left_column: ASSET_ID
+        right_column: ASSET_ID
+    join_type: left_outer
+    relationship_type: many_to_one
+
+  - name: ami_to_asset
+    left_table: AMI_READING
+    right_table: ASSET
+    relationship_columns:
+      - left_column: ASSET_ID
+        right_column: ASSET_ID
+    join_type: left_outer
+    relationship_type: many_to_one
+
+  - name: risk_to_asset
+    left_table: RISK_ASSESSMENT
+    right_table: ASSET
+    relationship_columns:
+      - left_column: ASSET_ID
+        right_column: ASSET_ID
+    join_type: left_outer
+    relationship_type: many_to_one
+
+  - name: weather_to_location
+    left_table: WEATHER_DATA
+    right_table: LOCATION
+    relationship_columns:
+      - left_column: LOCATION_ID
+        right_column: LOCATION_ID
+    join_type: left_outer
+    relationship_type: many_to_one
+
+  - name: workorder_to_asset
+    left_table: WORK_ORDER
+    right_table: ASSET
+    relationship_columns:
+      - left_column: ASSET_ID
+        right_column: ASSET_ID
+    join_type: left_outer
+    relationship_type: many_to_one
+
+  # ML prediction relationships
+  - name: health_pred_to_asset
+    left_table: ASSET_HEALTH_PREDICTION
+    right_table: ASSET
+    relationship_columns:
+      - left_column: ASSET_ID
+        right_column: ASSET_ID
+    join_type: left_outer
+    relationship_type: many_to_one
+
+  - name: ignition_pred_to_asset
+    left_table: IGNITION_RISK_PREDICTION
+    right_table: ASSET
+    relationship_columns:
+      - left_column: ASSET_ID
+        right_column: ASSET_ID
+    join_type: left_outer
+    relationship_type: many_to_one
+
+  - name: veg_pred_to_encroachment
+    left_table: VEGETATION_GROWTH_PREDICTION
+    right_table: VEGETATION_ENCROACHMENT
+    relationship_columns:
+      - left_column: ENCROACHMENT_ID
+        right_column: ENCROACHMENT_ID
+    join_type: left_outer
+    relationship_type: many_to_one
+
+  - name: veg_pred_to_asset
+    left_table: VEGETATION_GROWTH_PREDICTION
+    right_table: ASSET
+    relationship_columns:
+      - left_column: ASSET_ID
+        right_column: ASSET_ID
+    join_type: left_outer
+    relationship_type: many_to_one
+
+  - name: cable_pred_to_asset
+    left_table: CABLE_FAILURE_PREDICTION
+    right_table: ASSET
+    relationship_columns:
+      - left_column: ASSET_ID
+        right_column: ASSET_ID
+    join_type: left_outer
+    relationship_type: many_to_one
+
+# =============================================================================
+# VERIFIED QUERIES
+# =============================================================================
+
+verified_queries:
+  # Basic counts
+  - name: total_assets
+    question: "How many assets do we have?"
+    sql: "SELECT COUNT(*) as TOTAL_ASSETS FROM RISK_PLANNING_DB.ATOMIC.ASSET"
+    verified_at: 1707400000
+    verified_by: VIGIL
+
+  - name: assets_by_type
+    question: "How many assets by type?"
+    sql: "SELECT ASSET_TYPE, COUNT(*) as COUNT FROM RISK_PLANNING_DB.ATOMIC.ASSET GROUP BY ASSET_TYPE ORDER BY COUNT DESC"
+    verified_at: 1707400000
+    verified_by: VIGIL
+
+  # Risk queries
+  - name: high_risk_assets
+    question: "Show me high risk assets"
+    sql: |
+      SELECT a.ASSET_ID, a.ASSET_TYPE, a.ASSET_AGE_YEARS, a.CONDITION_SCORE, r.COMPOSITE_RISK_SCORE, r.RISK_TIER 
+      FROM RISK_PLANNING_DB.ATOMIC.ASSET a 
+      JOIN RISK_PLANNING_DB.ATOMIC.RISK_ASSESSMENT r ON a.ASSET_ID = r.ASSET_ID 
+      WHERE r.RISK_TIER IN ('CRITICAL', 'HIGH') 
+      ORDER BY r.COMPOSITE_RISK_SCORE DESC 
+      LIMIT 50
+    verified_at: 1707400000
+    verified_by: VIGIL
+
+  - name: tier3_fire_assets
+    question: "Show me assets in Tier 3 fire districts"
+    sql: |
+      SELECT a.ASSET_ID, a.ASSET_TYPE, a.CONDITION_SCORE, c.CIRCUIT_NAME, c.FIRE_THREAT_DISTRICT, c.TOTAL_CUSTOMERS
+      FROM RISK_PLANNING_DB.ATOMIC.ASSET a 
+      JOIN RISK_PLANNING_DB.ATOMIC.CIRCUIT c ON a.CIRCUIT_ID = c.CIRCUIT_ID 
+      WHERE c.FIRE_THREAT_DISTRICT = 'TIER_3' 
+      LIMIT 100
+    verified_at: 1707400000
+    verified_by: VIGIL
+
+  # ML Prediction queries
+  - name: critical_health_predictions
+    question: "Which assets are predicted to be in critical condition?"
+    sql: |
+      SELECT hp.ASSET_ID, hp.ASSET_TYPE, hp.PREDICTED_HEALTH_SCORE, hp.PREDICTED_CONDITION, hp.HEALTH_DELTA
+      FROM RISK_PLANNING_DB.ML.ASSET_HEALTH_PREDICTION hp
+      WHERE hp.PREDICTED_CONDITION = 'CRITICAL'
+      ORDER BY hp.PREDICTED_HEALTH_SCORE ASC
+      LIMIT 50
+    verified_at: 1707400000
+    verified_by: VIGIL
+
+  - name: high_ignition_risk
+    question: "Show assets with high ignition risk"
+    sql: |
+      SELECT ir.ASSET_ID, ir.ASSET_TYPE, ir.RISK_LEVEL, ir.CONDITION_SCORE, ir.AVG_CLEARANCE_DEFICIT
+      FROM RISK_PLANNING_DB.ML.IGNITION_RISK_PREDICTION ir
+      WHERE ir.RISK_LEVEL = 'HIGH'
+      ORDER BY ir.AVG_CLEARANCE_DEFICIT DESC
+      LIMIT 50
+    verified_at: 1707400000
+    verified_by: VIGIL
+
+  - name: urgent_vegetation_trim
+    question: "Which vegetation needs urgent trimming?"
+    sql: |
+      SELECT vg.ASSET_ID, vg.SPECIES, vg.PREDICTED_GROWTH_RATE, vg.CURRENT_CLEARANCE_FT, 
+             vg.PREDICTED_DAYS_TO_CONTACT, vg.GROWTH_RISK
+      FROM RISK_PLANNING_DB.ML.VEGETATION_GROWTH_PREDICTION vg
+      WHERE vg.GROWTH_RISK = 'HIGH' OR vg.PREDICTED_DAYS_TO_CONTACT < 30
+      ORDER BY vg.PREDICTED_DAYS_TO_CONTACT ASC
+      LIMIT 50
+    verified_at: 1707400000
+    verified_by: VIGIL
+
+  - name: water_treeing_cables
+    question: "Find underground cables with water treeing indicators"
+    sql: |
+      SELECT cf.ASSET_ID, cf.MATERIAL, cf.ASSET_AGE_YEARS, cf.MOISTURE_EXPOSURE,
+             cf.RAIN_CORRELATED_DIPS, cf.RAIN_VOLTAGE_CORRELATION, cf.RISK_LEVEL
+      FROM RISK_PLANNING_DB.ML.CABLE_FAILURE_PREDICTION cf
+      WHERE cf.RISK_LEVEL = 'HIGH' OR cf.RAIN_VOLTAGE_CORRELATION < -0.5
+      ORDER BY cf.RAIN_VOLTAGE_CORRELATION ASC
+      LIMIT 50
+    verified_at: 1707400000
+    verified_by: VIGIL
+
+  # Combined ML insights
+  - name: combined_asset_risk
+    question: "Show me assets with all their ML predictions"
+    sql: |
+      SELECT a.ASSET_ID, a.ASSET_TYPE, a.CONDITION_SCORE,
+             hp.PREDICTED_HEALTH_SCORE, hp.PREDICTED_CONDITION,
+             ir.RISK_LEVEL as IGNITION_RISK,
+             cf.RISK_LEVEL as WATER_TREEING_RISK
+      FROM RISK_PLANNING_DB.ATOMIC.ASSET a
+      LEFT JOIN RISK_PLANNING_DB.ML.ASSET_HEALTH_PREDICTION hp ON a.ASSET_ID = hp.ASSET_ID
+      LEFT JOIN RISK_PLANNING_DB.ML.IGNITION_RISK_PREDICTION ir ON a.ASSET_ID = ir.ASSET_ID
+      LEFT JOIN RISK_PLANNING_DB.ML.CABLE_FAILURE_PREDICTION cf ON a.ASSET_ID = cf.ASSET_ID
+      LIMIT 100
+    verified_at: 1707400000
+    verified_by: VIGIL
+
+  - name: high_priority_maintenance
+    question: "Which assets need urgent maintenance attention?"
+    sql: |
+      SELECT a.ASSET_ID, a.ASSET_TYPE, a.ASSET_AGE_YEARS,
+             hp.PREDICTED_CONDITION as HEALTH_STATUS,
+             ir.RISK_LEVEL as IGNITION_RISK,
+             cf.RISK_LEVEL as CABLE_RISK,
+             c.FIRE_THREAT_DISTRICT
+      FROM RISK_PLANNING_DB.ATOMIC.ASSET a
+      JOIN RISK_PLANNING_DB.ATOMIC.CIRCUIT c ON a.CIRCUIT_ID = c.CIRCUIT_ID
+      LEFT JOIN RISK_PLANNING_DB.ML.ASSET_HEALTH_PREDICTION hp ON a.ASSET_ID = hp.ASSET_ID
+      LEFT JOIN RISK_PLANNING_DB.ML.IGNITION_RISK_PREDICTION ir ON a.ASSET_ID = ir.ASSET_ID
+      LEFT JOIN RISK_PLANNING_DB.ML.CABLE_FAILURE_PREDICTION cf ON a.ASSET_ID = cf.ASSET_ID
+      WHERE hp.PREDICTED_CONDITION = 'CRITICAL'
+         OR ir.RISK_LEVEL = 'HIGH'
+         OR cf.RISK_LEVEL = 'HIGH'
+      ORDER BY c.FIRE_THREAT_DISTRICT DESC, hp.PREDICTED_HEALTH_SCORE ASC
+      LIMIT 100
+    verified_at: 1707400000
+    verified_by: VIGIL
+
+  - name: ml_prediction_summary
+    question: "Give me a summary of all ML predictions"
+    sql: |
+      SELECT 
+        (SELECT COUNT(*) FROM RISK_PLANNING_DB.ML.ASSET_HEALTH_PREDICTION WHERE PREDICTED_CONDITION = 'CRITICAL') as CRITICAL_HEALTH_COUNT,
+        (SELECT COUNT(*) FROM RISK_PLANNING_DB.ML.IGNITION_RISK_PREDICTION WHERE RISK_LEVEL = 'HIGH') as HIGH_IGNITION_COUNT,
+        (SELECT COUNT(*) FROM RISK_PLANNING_DB.ML.VEGETATION_GROWTH_PREDICTION WHERE GROWTH_RISK = 'HIGH') as URGENT_VEG_COUNT,
+        (SELECT COUNT(*) FROM RISK_PLANNING_DB.ML.CABLE_FAILURE_PREDICTION WHERE RISK_LEVEL = 'HIGH') as WATER_TREEING_COUNT
+    verified_at: 1707400000
+    verified_by: VIGIL
+
+  # Regional analysis
+  - name: risk_by_region
+    question: "Show risk distribution by region"
+    sql: |
+      SELECT l.REGION, r.RISK_TIER, COUNT(*) as ASSET_COUNT
+      FROM RISK_PLANNING_DB.ATOMIC.RISK_ASSESSMENT r
+      JOIN RISK_PLANNING_DB.ATOMIC.ASSET a ON r.ASSET_ID = a.ASSET_ID
+      JOIN RISK_PLANNING_DB.ATOMIC.LOCATION l ON a.LOCATION_ID = l.LOCATION_ID
+      GROUP BY l.REGION, r.RISK_TIER
+      ORDER BY l.REGION, r.RISK_TIER
+    verified_at: 1707400000
+    verified_by: VIGIL
+
+  - name: customers_at_risk_tier3
+    question: "How many customers are at risk in Tier 3 areas?"
+    sql: |
+      SELECT c.CIRCUIT_NAME, c.FIRE_THREAT_DISTRICT, c.TOTAL_CUSTOMERS, c.CRITICAL_FACILITIES, c.MEDICAL_BASELINE_CUSTOMERS
+      FROM RISK_PLANNING_DB.ATOMIC.CIRCUIT c
+      WHERE c.FIRE_THREAT_DISTRICT = 'TIER_3'
+      ORDER BY c.TOTAL_CUSTOMERS DESC
+      LIMIT 50
+    verified_at: 1707400000
+    verified_by: VIGIL
+
+  # Vegetation compliance
+  - name: vegetation_compliance
+    question: "Show vegetation compliance status"
+    sql: |
+      SELECT 
+        SUM(CASE WHEN GO95_COMPLIANT THEN 1 ELSE 0 END) as COMPLIANT_COUNT,
+        SUM(CASE WHEN NOT GO95_COMPLIANT THEN 1 ELSE 0 END) as NON_COMPLIANT_COUNT,
+        AVG(CLEARANCE_DEFICIT_FT) as AVG_CLEARANCE_DEFICIT,
+        SUM(ESTIMATED_TRIM_COST) as TOTAL_TRIM_COST
+      FROM RISK_PLANNING_DB.ATOMIC.VEGETATION_ENCROACHMENT
+    verified_at: 1707400000
+    verified_by: VIGIL
+
+  # Work order status
+  - name: open_work_orders
+    question: "Show open work orders by priority"
+    sql: |
+      SELECT PRIORITY, WORK_TYPE, COUNT(*) as COUNT, SUM(ESTIMATED_COST) as TOTAL_ESTIMATED_COST
+      FROM RISK_PLANNING_DB.ATOMIC.WORK_ORDER
+      WHERE STATUS IN ('OPEN', 'IN_PROGRESS')
+      GROUP BY PRIORITY, WORK_TYPE
+      ORDER BY PRIORITY, COUNT DESC
+    verified_at: 1707400000
+    verified_by: VIGIL

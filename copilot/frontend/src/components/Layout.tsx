@@ -8,7 +8,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Activity,
-  Flame
+  Flame,
+  Brain
 } from 'lucide-react'
 import { useState } from 'react'
 import type { Page } from '../App'
@@ -21,6 +22,7 @@ interface LayoutProps {
 
 const navItems = [
   { id: 'dashboard' as Page, label: 'Risk Dashboard', icon: LayoutDashboard },
+  { id: 'ml' as Page, label: 'ML Predictions', icon: Brain, highlight: true },
   { id: 'map' as Page, label: 'Asset Map', icon: Map },
   { id: 'vegetation' as Page, label: 'Vegetation', icon: TreePine },
   { id: 'workorders' as Page, label: 'Work Orders', icon: Wrench },

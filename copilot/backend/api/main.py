@@ -703,25 +703,25 @@ async def get_ami_correlation():
 
 @app.get("/ml/asset-health", tags=["ML Predictions"])
 async def get_asset_health_predictions(limit: int = Query(100, le=500)):
-    """Get ML-predicted asset health scores and replacement timing."""
+    """Get ML-predicted asset health scores and degradation trends."""
     try:
         results = snowflake_service.execute_query(f"""
             SELECT 
-                PREDICTION_ID, ASSET_ID, ASSET_TYPE, MATERIAL,
-                ACTUAL_CONDITION_SCORE, PREDICTED_CONDITION_SCORE,
-                ASSET_AGE_YEARS, PREDICTED_YEARS_TO_REPLACEMENT,
-                REPLACEMENT_PRIORITY, PREDICTION_DATE, MODEL_VERSION
+                PREDICTION_ID, ASSET_ID, ASSET_TYPE,
+                ACTUAL_HEALTH_SCORE, PREDICTED_HEALTH_SCORE,
+                HEALTH_DELTA, MODEL_CONFIDENCE, PREDICTED_CONDITION,
+                PREDICTION_DATE, MODEL_VERSION
             FROM RISK_PLANNING_DB.ML.ASSET_HEALTH_PREDICTION
-            ORDER BY PREDICTED_YEARS_TO_REPLACEMENT ASC
+            ORDER BY PREDICTED_HEALTH_SCORE ASC
             LIMIT {limit}
         """)
-        urgent = [r for r in results if r.get("PREDICTED_YEARS_TO_REPLACEMENT", 99) <= 2]
+        critical = [r for r in results if r.get("PREDICTED_CONDITION") == "CRITICAL"]
         return {
             "predictions": results,
             "summary": {
                 "total_predictions": len(results),
-                "urgent_replacements": len(urgent),
-                "avg_years_to_replacement": sum(r.get("PREDICTED_YEARS_TO_REPLACEMENT", 0) for r in results) / max(len(results), 1)
+                "critical_condition": len(critical),
+                "avg_health_score": sum(r.get("PREDICTED_HEALTH_SCORE", 0) or 0 for r in results) / max(len(results), 1)
             },
             "fire_season": snowflake_service.get_fire_season_countdown()
         }
@@ -741,16 +741,18 @@ async def get_vegetation_growth_predictions(limit: int = Query(100, le=500)):
                 CURRENT_CLEARANCE_FT, PREDICTED_DAYS_TO_CONTACT,
                 GROWTH_RISK, PREDICTION_DATE, MODEL_VERSION
             FROM RISK_PLANNING_DB.ML.VEGETATION_GROWTH_PREDICTION
-            ORDER BY PREDICTED_GROWTH_RATE DESC
+            ORDER BY PREDICTED_DAYS_TO_CONTACT ASC
             LIMIT {limit}
         """)
         high_risk = [r for r in results if r.get("GROWTH_RISK") == "HIGH"]
+        urgent = [r for r in results if (r.get("PREDICTED_DAYS_TO_CONTACT") or 999) < 30]
         return {
             "predictions": results,
             "summary": {
                 "total_predictions": len(results),
                 "high_growth_risk": len(high_risk),
-                "avg_growth_rate": sum(r.get("PREDICTED_GROWTH_RATE", 0) for r in results) / max(len(results), 1)
+                "urgent_trim_needed": len(urgent),
+                "avg_days_to_contact": sum(r.get("PREDICTED_DAYS_TO_CONTACT", 0) or 0 for r in results) / max(len(results), 1)
             },
             "fire_season": snowflake_service.get_fire_season_countdown()
         }
@@ -770,15 +772,20 @@ async def get_ignition_risk_predictions(limit: int = Query(100, le=500)):
                 CONDITION_SCORE, AVG_CLEARANCE_DEFICIT,
                 RISK_LEVEL, PREDICTION_DATE, MODEL_VERSION
             FROM RISK_PLANNING_DB.ML.IGNITION_RISK_PREDICTION
-            WHERE PREDICTED_IGNITION_RISK = 1
-            ORDER BY CONDITION_SCORE ASC
+            ORDER BY RISK_LEVEL DESC, CONDITION_SCORE ASC
             LIMIT {limit}
         """)
+        high_risk = [r for r in results if r.get("RISK_LEVEL") == "HIGH"]
+        by_type = {}
+        for r in high_risk:
+            t = r.get("ASSET_TYPE", "UNKNOWN")
+            by_type[t] = by_type.get(t, 0) + 1
         return {
             "predictions": results,
             "summary": {
-                "high_risk_assets": len(results),
-                "by_asset_type": {}
+                "total_predictions": len(results),
+                "high_risk_assets": len(high_risk),
+                "by_asset_type": by_type
             },
             "fire_season": snowflake_service.get_fire_season_countdown()
         }
@@ -833,25 +840,26 @@ async def get_ml_summary():
     try:
         asset_health = snowflake_service.execute_query("""
             SELECT COUNT(*) as total,
-                   SUM(CASE WHEN PREDICTED_YEARS_TO_REPLACEMENT <= 2 THEN 1 ELSE 0 END) as urgent
+                   SUM(CASE WHEN PREDICTED_CONDITION = 'CRITICAL' THEN 1 ELSE 0 END) as critical
             FROM RISK_PLANNING_DB.ML.ASSET_HEALTH_PREDICTION
         """)[0]
         
         veg_growth = snowflake_service.execute_query("""
             SELECT COUNT(*) as total,
-                   SUM(CASE WHEN GROWTH_RISK = 'HIGH' THEN 1 ELSE 0 END) as high_risk
+                   SUM(CASE WHEN GROWTH_RISK = 'HIGH' THEN 1 ELSE 0 END) as high_risk,
+                   SUM(CASE WHEN PREDICTED_DAYS_TO_CONTACT < 30 THEN 1 ELSE 0 END) as urgent
             FROM RISK_PLANNING_DB.ML.VEGETATION_GROWTH_PREDICTION
         """)[0]
         
         ignition = snowflake_service.execute_query("""
             SELECT COUNT(*) as total,
-                   SUM(PREDICTED_IGNITION_RISK) as high_risk
+                   SUM(CASE WHEN RISK_LEVEL = 'HIGH' THEN 1 ELSE 0 END) as high_risk
             FROM RISK_PLANNING_DB.ML.IGNITION_RISK_PREDICTION
         """)[0]
         
         cable = snowflake_service.execute_query("""
             SELECT COUNT(*) as total,
-                   SUM(PREDICTED_WATER_TREEING) as at_risk
+                   SUM(CASE WHEN RISK_LEVEL = 'HIGH' THEN 1 ELSE 0 END) as at_risk
             FROM RISK_PLANNING_DB.ML.CABLE_FAILURE_PREDICTION
         """)[0]
         
@@ -859,34 +867,145 @@ async def get_ml_summary():
             "models": {
                 "asset_health": {
                     "name": "Asset Health Predictor",
+                    "icon": "activity",
                     "total_predictions": asset_health.get("TOTAL", 0),
-                    "urgent_replacements": asset_health.get("URGENT", 0),
-                    "algorithm": "GradientBoostingRegressor"
+                    "critical_count": asset_health.get("CRITICAL", 0),
+                    "algorithm": "GradientBoostingRegressor",
+                    "status": "active"
                 },
                 "vegetation_growth": {
-                    "name": "Vegetation Growth Predictor",
+                    "name": "Vegetation Growth",
+                    "icon": "tree-pine",
                     "total_predictions": veg_growth.get("TOTAL", 0),
-                    "high_growth_risk": veg_growth.get("HIGH_RISK", 0),
-                    "algorithm": "RandomForestRegressor"
+                    "high_risk_count": veg_growth.get("HIGH_RISK", 0),
+                    "urgent_count": veg_growth.get("URGENT", 0),
+                    "algorithm": "RandomForestRegressor",
+                    "status": "active"
                 },
                 "ignition_risk": {
-                    "name": "Ignition Risk Predictor",
+                    "name": "Ignition Risk",
+                    "icon": "flame",
                     "total_predictions": ignition.get("TOTAL", 0),
-                    "high_risk_assets": ignition.get("HIGH_RISK", 0),
-                    "algorithm": "GradientBoostingClassifier"
+                    "high_risk_count": ignition.get("HIGH_RISK", 0),
+                    "algorithm": "GradientBoostingClassifier",
+                    "status": "active"
                 },
                 "cable_failure": {
-                    "name": "Cable Failure (Water Treeing)",
+                    "name": "Water Treeing",
+                    "icon": "zap",
                     "total_predictions": cable.get("TOTAL", 0),
-                    "at_risk_cables": cable.get("AT_RISK", 0),
-                    "algorithm": "Rule-Based + GradientBoostingClassifier",
-                    "hidden_discovery": True
+                    "at_risk_count": cable.get("AT_RISK", 0),
+                    "algorithm": "Correlation Analysis",
+                    "hidden_discovery": True,
+                    "status": "active"
                 }
             },
             "fire_season": snowflake_service.get_fire_season_countdown()
         }
     except Exception as e:
         logger.error(f"ML summary error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/ml/combined-risk", tags=["ML Predictions"])
+async def get_combined_risk_summary(limit: int = Query(100, le=500)):
+    """Get combined ML risk view from dynamic table with all predictions merged."""
+    try:
+        results = snowflake_service.execute_query(f"""
+            SELECT 
+                ASSET_ID, ASSET_TYPE, ACTUAL_CONDITION, ASSET_AGE_YEARS,
+                REGION, FIRE_THREAT_DISTRICT, TOTAL_CUSTOMERS,
+                PREDICTED_HEALTH_SCORE, HEALTH_STATUS, HEALTH_DELTA,
+                IGNITION_RISK_LEVEL, AVG_CLEARANCE_DEFICIT,
+                WATER_TREEING_RISK, RAIN_VOLTAGE_CORRELATION,
+                COMPOSITE_ML_RISK_SCORE, MAINTENANCE_PRIORITY
+            FROM RISK_PLANNING_DB.ML.COMBINED_RISK_SUMMARY
+            ORDER BY COMPOSITE_ML_RISK_SCORE DESC
+            LIMIT {limit}
+        """)
+        
+        by_priority = {}
+        by_region = {}
+        for r in results:
+            p = r.get("MAINTENANCE_PRIORITY", "UNKNOWN")
+            by_priority[p] = by_priority.get(p, 0) + 1
+            reg = r.get("REGION", "UNKNOWN")
+            by_region[reg] = by_region.get(reg, 0) + 1
+        
+        return {
+            "assets": results,
+            "summary": {
+                "total_assets": len(results),
+                "by_priority": by_priority,
+                "by_region": by_region,
+                "avg_risk_score": sum(r.get("COMPOSITE_ML_RISK_SCORE", 0) or 0 for r in results) / max(len(results), 1)
+            },
+            "fire_season": snowflake_service.get_fire_season_countdown()
+        }
+    except Exception as e:
+        logger.error(f"Combined risk error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/ml/combined-risk/by-region", tags=["ML Predictions"])
+async def get_combined_risk_by_region():
+    """Get aggregated ML risk metrics by region for dashboard visualization."""
+    try:
+        results = snowflake_service.execute_query("""
+            SELECT 
+                REGION,
+                COUNT(*) as ASSET_COUNT,
+                AVG(COMPOSITE_ML_RISK_SCORE) as AVG_RISK_SCORE,
+                SUM(CASE WHEN MAINTENANCE_PRIORITY = 'EMERGENCY' THEN 1 ELSE 0 END) as EMERGENCY_COUNT,
+                SUM(CASE WHEN MAINTENANCE_PRIORITY = 'HIGH' THEN 1 ELSE 0 END) as HIGH_PRIORITY_COUNT,
+                SUM(CASE WHEN HEALTH_STATUS = 'CRITICAL' THEN 1 ELSE 0 END) as CRITICAL_HEALTH_COUNT,
+                SUM(CASE WHEN IGNITION_RISK_LEVEL = 'HIGH' THEN 1 ELSE 0 END) as HIGH_IGNITION_COUNT,
+                SUM(CASE WHEN WATER_TREEING_RISK = 'HIGH' THEN 1 ELSE 0 END) as WATER_TREEING_COUNT
+            FROM RISK_PLANNING_DB.ML.COMBINED_RISK_SUMMARY
+            GROUP BY REGION
+            ORDER BY AVG_RISK_SCORE DESC
+        """)
+        return {
+            "regions": results,
+            "fire_season": snowflake_service.get_fire_season_countdown()
+        }
+    except Exception as e:
+        logger.error(f"Risk by region error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/ml/urgent-actions", tags=["ML Predictions"])
+async def get_urgent_ml_actions(limit: int = Query(50, le=200)):
+    """Get assets requiring urgent action based on ML predictions."""
+    try:
+        results = snowflake_service.execute_query(f"""
+            SELECT 
+                ASSET_ID, ASSET_TYPE, REGION, FIRE_THREAT_DISTRICT,
+                HEALTH_STATUS, IGNITION_RISK_LEVEL, WATER_TREEING_RISK,
+                COMPOSITE_ML_RISK_SCORE, MAINTENANCE_PRIORITY,
+                TOTAL_CUSTOMERS
+            FROM RISK_PLANNING_DB.ML.COMBINED_RISK_SUMMARY
+            WHERE MAINTENANCE_PRIORITY IN ('EMERGENCY', 'HIGH')
+            ORDER BY 
+                CASE MAINTENANCE_PRIORITY WHEN 'EMERGENCY' THEN 1 WHEN 'HIGH' THEN 2 END,
+                COMPOSITE_ML_RISK_SCORE DESC
+            LIMIT {limit}
+        """)
+        
+        emergency = [r for r in results if r.get("MAINTENANCE_PRIORITY") == "EMERGENCY"]
+        high = [r for r in results if r.get("MAINTENANCE_PRIORITY") == "HIGH"]
+        
+        return {
+            "urgent_assets": results,
+            "summary": {
+                "emergency_count": len(emergency),
+                "high_priority_count": len(high),
+                "total_customers_affected": sum(r.get("TOTAL_CUSTOMERS", 0) or 0 for r in emergency)
+            },
+            "fire_season": snowflake_service.get_fire_season_countdown()
+        }
+    except Exception as e:
+        logger.error(f"Urgent actions error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

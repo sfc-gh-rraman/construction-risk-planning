@@ -8,10 +8,11 @@ import {
   Vegetation, 
   WorkOrders,
   AssetRegistry,
-  Architecture
+  Architecture,
+  MLPredictions
 } from './pages'
 
-export type Page = 'landing' | 'dashboard' | 'map' | 'vegetation' | 'workorders' | 'assets' | 'architecture'
+export type Page = 'landing' | 'dashboard' | 'map' | 'vegetation' | 'workorders' | 'assets' | 'architecture' | 'ml'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,6 +48,8 @@ function App() {
         return <AssetRegistry />
       case 'architecture':
         return <Architecture />
+      case 'ml':
+        return <MLPredictions />
       default:
         return <RiskDashboard />
     }

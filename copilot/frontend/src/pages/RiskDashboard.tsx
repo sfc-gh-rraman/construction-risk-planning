@@ -6,10 +6,12 @@ import {
   Zap,
   TreePine,
   Flame,
-  Building2
+  Building2,
+  Brain
 } from 'lucide-react'
 import { Copilot } from '../components/Copilot'
 import { FireSeasonBanner } from '../components/FireSeasonBanner'
+import { MLInsightsPanel } from '../components/MLInsightsPanel'
 import { getDashboardMetrics } from '../services/api'
 import type { DashboardMetrics } from '../types'
 import { REGIONS, RISK_TIER_COLORS } from '../types'
@@ -100,6 +102,7 @@ function AlertCard({ alert }: AlertCardProps) {
 
 export function RiskDashboard() {
   const [selectedRegion, setSelectedRegion] = useState('All')
+  const [showMLPanel, setShowMLPanel] = useState(true)
 
   const { data: metrics, isLoading } = useQuery<DashboardMetrics>({
     queryKey: ['dashboardMetrics'],
@@ -364,12 +367,34 @@ export function RiskDashboard() {
               <h2 className="font-semibold text-white">VIGIL Co-Pilot</h2>
               <p className="text-xs text-slate-500">Ask about risk, vegetation, assets, and hidden patterns</p>
             </div>
-            <div className="flex items-center gap-2 text-xs">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-slate-500">4 Agents Ready</span>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setShowMLPanel(!showMLPanel)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  showMLPanel 
+                    ? 'bg-purple-600 text-white' 
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                <Brain size={14} />
+                ML Insights
+              </button>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="text-slate-500">4 Agents Ready</span>
+              </div>
             </div>
           </div>
-          <Copilot onWorkOrderCreated={() => {}} />
+          <div className="flex-1 flex min-h-0">
+            <div className={`${showMLPanel ? 'flex-1' : 'w-full'} flex flex-col`}>
+              <Copilot onWorkOrderCreated={() => {}} />
+            </div>
+            {showMLPanel && (
+              <div className="w-[340px] flex-shrink-0 border-l border-gray-700/50 bg-gray-900/50">
+                <MLInsightsPanel />
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
