@@ -158,10 +158,10 @@ export function Architecture() {
       icon: Brain,
       liveCount: totalPredictions,
       items: [
-        { name: 'Asset Health Model', desc: 'GradientBoostingRegressor', live: true },
-        { name: 'Vegetation Growth', desc: 'RandomForestRegressor', live: true },
-        { name: 'Ignition Risk', desc: 'GradientBoostingClassifier', live: true },
-        { name: 'Water Treeing', desc: 'Correlation Analysis', live: true },
+        { name: 'ML Layer 1', desc: 'Health Scoring', live: true },
+        { name: 'ML Layer 2', desc: 'Growth Prediction', live: true },
+        { name: 'ML Layer 3', desc: 'Risk Classification', live: true },
+        { name: 'ML Layer 4', desc: 'Anomaly Detection', live: true },
       ]
     },
     {
@@ -182,7 +182,7 @@ export function Architecture() {
   const capabilities = [
     { icon: Flame, title: 'Fire Risk Intelligence', desc: 'PSPS threat assessment with ignition probability scoring', color: 'text-orange-400' },
     { icon: TreePine, title: 'Vegetation Compliance', desc: 'GO95 tracking with automated scheduling', color: 'text-green-400' },
-    { icon: Zap, title: 'Asset Health', desc: 'Condition monitoring and failure prediction', color: 'text-blue-400' },
+    { icon: Zap, title: 'Asset Health', desc: 'Predictive maintenance and condition monitoring', color: 'text-blue-400' },
     { icon: Shield, title: 'Regulatory Compliance', desc: 'CPUC audit-ready reporting', color: 'text-purple-400' },
   ]
 
@@ -202,7 +202,7 @@ export function Architecture() {
           <div className="flex items-center justify-center gap-6 mt-4">
             <LiveQueryCounter count={totalPredictions} label="ML predictions" />
             <LiveQueryCounter count={5000} label="assets monitored" />
-            <LiveQueryCounter count={4} label="active models" />
+            <LiveQueryCounter count={4} label="ML layers" />
           </div>
         </div>
 

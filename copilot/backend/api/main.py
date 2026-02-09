@@ -866,36 +866,36 @@ async def get_ml_summary():
         return {
             "models": {
                 "asset_health": {
-                    "name": "Asset Health Predictor",
+                    "name": "ML Layer 1",
                     "icon": "activity",
                     "total_predictions": asset_health.get("TOTAL", 0),
                     "critical_count": asset_health.get("CRITICAL", 0),
-                    "algorithm": "GradientBoostingRegressor",
+                    "algorithm": "Health Scoring",
                     "status": "active"
                 },
                 "vegetation_growth": {
-                    "name": "Vegetation Growth",
+                    "name": "ML Layer 2",
                     "icon": "tree-pine",
                     "total_predictions": veg_growth.get("TOTAL", 0),
                     "high_risk_count": veg_growth.get("HIGH_RISK", 0),
                     "urgent_count": veg_growth.get("URGENT", 0),
-                    "algorithm": "RandomForestRegressor",
+                    "algorithm": "Growth Prediction",
                     "status": "active"
                 },
                 "ignition_risk": {
-                    "name": "Ignition Risk",
+                    "name": "ML Layer 3",
                     "icon": "flame",
                     "total_predictions": ignition.get("TOTAL", 0),
                     "high_risk_count": ignition.get("HIGH_RISK", 0),
-                    "algorithm": "GradientBoostingClassifier",
+                    "algorithm": "Risk Classification",
                     "status": "active"
                 },
                 "cable_failure": {
-                    "name": "Water Treeing",
+                    "name": "ML Layer 4",
                     "icon": "zap",
                     "total_predictions": cable.get("TOTAL", 0),
                     "at_risk_count": cable.get("AT_RISK", 0),
-                    "algorithm": "Correlation Analysis",
+                    "algorithm": "Anomaly Detection",
                     "hidden_discovery": True,
                     "status": "active"
                 }
@@ -1094,8 +1094,8 @@ async def get_feature_importance(model_name: str):
     """
     feature_importance = {
         "asset_health": {
-            "model_name": "Asset Health Predictor",
-            "algorithm": "GradientBoostingRegressor",
+            "model_name": "ML Layer 1 - Health Scoring",
+            "algorithm": "Regression Model",
             "features": [
                 {"name": "Asset Age (Years)", "importance": 0.32, "direction": "negative", "description": "Older assets have lower health scores"},
                 {"name": "Maintenance Frequency", "importance": 0.24, "direction": "positive", "description": "Regular maintenance improves health"},
@@ -1108,8 +1108,8 @@ async def get_feature_importance(model_name: str):
             "model_accuracy": 0.87
         },
         "vegetation_growth": {
-            "model_name": "Vegetation Growth Predictor",
-            "algorithm": "RandomForestRegressor",
+            "model_name": "ML Layer 2 - Growth Prediction",
+            "algorithm": "Regression Model",
             "features": [
                 {"name": "Species Growth Rate", "importance": 0.35, "direction": "positive", "description": "Fast-growing species need more frequent trimming"},
                 {"name": "Current Clearance", "importance": 0.28, "direction": "negative", "description": "Less clearance = faster contact"},
@@ -1122,8 +1122,8 @@ async def get_feature_importance(model_name: str):
             "model_accuracy": 0.82
         },
         "ignition_risk": {
-            "model_name": "Ignition Risk Classifier",
-            "algorithm": "GradientBoostingClassifier",
+            "model_name": "ML Layer 3 - Risk Classification",
+            "algorithm": "Classification Model",
             "features": [
                 {"name": "Fire District Tier", "importance": 0.30, "direction": "positive", "description": "Tier 3 zones have highest base risk"},
                 {"name": "Clearance Deficit", "importance": 0.25, "direction": "positive", "description": "Non-compliant clearance increases ignition risk"},
@@ -1136,8 +1136,8 @@ async def get_feature_importance(model_name: str):
             "model_accuracy": 0.91
         },
         "cable_failure": {
-            "model_name": "Water Treeing Detector",
-            "algorithm": "Correlation Analysis + Decision Tree",
+            "model_name": "ML Layer 4 - Anomaly Detection",
+            "algorithm": "Pattern Analysis",
             "features": [
                 {"name": "Rain-Voltage Correlation", "importance": 0.40, "direction": "positive", "description": "Key indicator: voltage dips during rain"},
                 {"name": "Cable Age", "importance": 0.22, "direction": "positive", "description": "Older cables more susceptible"},

@@ -133,31 +133,31 @@ function generateNextAction(ml: MLPrediction | undefined, asset: MapFeature['pro
   }
 
   if (ml.cable?.PREDICTED_WATER_TREEING === 1) {
-    return { action: 'Cable replacement assessment', days: 14, source: 'Water Treeing Model' }
+    return { action: 'Cable replacement assessment', days: 14, source: 'ML Layer 4' }
   }
 
   if (ml.ignition?.RISK_LEVEL === 'HIGH') {
-    return { action: 'Fire mitigation inspection', days: 7, source: 'Ignition Risk Model' }
+    return { action: 'Fire mitigation inspection', days: 7, source: 'ML Layer 3' }
   }
 
   if (ml.vegetation?.PREDICTED_DAYS_TO_CONTACT && ml.vegetation.PREDICTED_DAYS_TO_CONTACT < 60) {
     return { 
       action: 'Vegetation trimming', 
       days: Math.max(1, Math.floor(ml.vegetation.PREDICTED_DAYS_TO_CONTACT * 0.75)),
-      source: 'Vegetation Growth Model'
+      source: 'ML Layer 2'
     }
   }
 
   if (ml.health?.PREDICTED_CONDITION === 'CRITICAL') {
-    return { action: 'Emergency inspection', days: 3, source: 'Health Prediction Model' }
+    return { action: 'Emergency inspection', days: 3, source: 'ML Layer 1' }
   }
 
   if (ml.combined?.MAINTENANCE_PRIORITY === 'EMERGENCY') {
-    return { action: 'Priority maintenance', days: 5, source: 'Combined Risk Model' }
+    return { action: 'Priority maintenance', days: 5, source: 'ML Fusion' }
   }
 
   if (ml.combined?.MAINTENANCE_PRIORITY === 'HIGH') {
-    return { action: 'Scheduled maintenance', days: 21, source: 'Combined Risk Model' }
+    return { action: 'Scheduled maintenance', days: 21, source: 'ML Fusion' }
   }
 
   return { action: 'Routine inspection', days: 90, source: 'Standard Schedule' }
@@ -519,11 +519,11 @@ export function AssetMap() {
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-blue-500" />
-                <span className="text-xs text-slate-300">Water Treeing</span>
+                <span className="text-xs text-slate-300">ML Layer 4 Alert</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-orange-500" />
-                <span className="text-xs text-slate-300">High Ignition</span>
+                <span className="text-xs text-slate-300">ML Layer 3 Alert</span>
               </div>
             </div>
           </div>

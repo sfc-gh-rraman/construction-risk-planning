@@ -36,7 +36,8 @@ interface ModelExplainability {
 const MODEL_CONFIGS = [
   { 
     id: 'asset_health', 
-    name: 'Asset Health', 
+    name: 'ML Layer 1', 
+    subtitle: 'Health Scoring',
     icon: Activity, 
     color: 'green',
     bgClass: 'from-green-500/20 to-green-600/10 border-green-500/30',
@@ -44,7 +45,8 @@ const MODEL_CONFIGS = [
   },
   { 
     id: 'vegetation_growth', 
-    name: 'Vegetation Growth', 
+    name: 'ML Layer 2', 
+    subtitle: 'Growth Prediction',
     icon: TreePine, 
     color: 'emerald',
     bgClass: 'from-emerald-500/20 to-emerald-600/10 border-emerald-500/30',
@@ -52,7 +54,8 @@ const MODEL_CONFIGS = [
   },
   { 
     id: 'ignition_risk', 
-    name: 'Ignition Risk', 
+    name: 'ML Layer 3', 
+    subtitle: 'Risk Classification',
     icon: Flame, 
     color: 'orange',
     bgClass: 'from-orange-500/20 to-orange-600/10 border-orange-500/30',
@@ -60,7 +63,8 @@ const MODEL_CONFIGS = [
   },
   { 
     id: 'cable_failure', 
-    name: 'Water Treeing', 
+    name: 'ML Layer 4', 
+    subtitle: 'Anomaly Detection',
     icon: Zap, 
     color: 'blue',
     bgClass: 'from-blue-500/20 to-blue-600/10 border-blue-500/30',
@@ -125,7 +129,7 @@ function ModelCard({ modelId, config }: { modelId: string; config: typeof MODEL_
           </div>
           <div className="text-left">
             <h3 className="font-semibold text-slate-200">{config.name}</h3>
-            <p className="text-xs text-slate-500">Feature importance analysis</p>
+            <p className="text-xs text-slate-500">{config.subtitle}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">

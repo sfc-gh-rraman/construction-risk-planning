@@ -100,10 +100,10 @@ interface RegionRisk {
 
 const tabs: { id: TabType; label: string; icon: React.ReactNode; color: string }[] = [
   { id: 'overview', label: 'Overview', icon: <Activity size={16} />, color: 'purple' },
-  { id: 'health', label: 'Asset Health', icon: <TrendingDown size={16} />, color: 'blue' },
-  { id: 'vegetation', label: 'Vegetation', icon: <TreePine size={16} />, color: 'green' },
-  { id: 'ignition', label: 'Ignition Risk', icon: <Flame size={16} />, color: 'orange' },
-  { id: 'cable', label: 'Water Treeing', icon: <Zap size={16} />, color: 'purple' },
+  { id: 'health', label: 'ML Layer 1', icon: <TrendingDown size={16} />, color: 'blue' },
+  { id: 'vegetation', label: 'ML Layer 2', icon: <TreePine size={16} />, color: 'green' },
+  { id: 'ignition', label: 'ML Layer 3', icon: <Flame size={16} />, color: 'orange' },
+  { id: 'cable', label: 'ML Layer 4', icon: <Zap size={16} />, color: 'purple' },
   { id: 'explainability', label: 'Explainability', icon: <Brain size={16} />, color: 'purple' }
 ]
 
@@ -504,7 +504,7 @@ export function MLPredictions() {
             <div className="p-4 border-b border-gray-700 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                 <TrendingDown className="text-blue-400" />
-                Asset Health Predictions
+                ML Layer 1 - Health Scoring
               </h2>
               <div className="flex items-center gap-2">
                 <div className="relative">
@@ -531,7 +531,7 @@ export function MLPredictions() {
             <div className="p-4 border-b border-gray-700">
               <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                 <TreePine className="text-green-400" />
-                Vegetation Growth Predictions
+                ML Layer 2 - Growth Prediction
               </h2>
             </div>
             <VegetationTable predictions={(vegData as { predictions: VegPrediction[] }).predictions || []} />
@@ -543,7 +543,7 @@ export function MLPredictions() {
             <div className="p-4 border-b border-gray-700">
               <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                 <Flame className="text-orange-400" />
-                Ignition Risk Predictions
+                ML Layer 3 - Risk Classification
               </h2>
             </div>
             <IgnitionTable predictions={(ignitionData as { predictions: IgnitionPrediction[] }).predictions || []} />
@@ -556,9 +556,9 @@ export function MLPredictions() {
               <div>
                 <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                   <Zap className="text-purple-400" />
-                  Water Treeing Detection
+                  ML Layer 4 - Anomaly Detection
                   <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 ml-2">
-                    HIDDEN DISCOVERY
+                    PATTERN DISCOVERY
                   </span>
                 </h2>
                 <p className="text-sm text-slate-400 mt-1">

@@ -285,27 +285,27 @@ export function Landing({ onNavigate }: LandingProps) {
               <Brain size={24} className="text-purple-400" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-purple-400 mb-2">🤖 4 ML Models Active</h3>
+              <h3 className="text-lg font-semibold text-purple-400 mb-2">🤖 4 ML Layers Active</h3>
               <p className="text-slate-300 text-sm mb-3">
-                VIGIL is powered by <strong className="text-white">4 trained ML models</strong> analyzing asset health, 
-                vegetation growth, ignition risk, and water treeing patterns in real-time.
+                VIGIL is powered by <strong className="text-white">4 trained ML layers</strong> analyzing asset health, 
+                vegetation growth, ignition risk, and anomaly detection patterns in real-time.
               </p>
               <div className="grid grid-cols-4 gap-4 text-sm">
                 <div className="flex items-center gap-2">
                   <Activity size={14} className="text-green-400" />
-                  <span className="text-slate-400">Asset Health</span>
+                  <span className="text-slate-400">ML Layer 1</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <TreePine size={14} className="text-green-500" />
-                  <span className="text-slate-400">Vegetation Growth</span>
+                  <span className="text-slate-400">ML Layer 2</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Flame size={14} className="text-orange-400" />
-                  <span className="text-slate-400">Ignition Risk</span>
+                  <span className="text-slate-400">ML Layer 3</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Zap size={14} className="text-blue-400" />
-                  <span className="text-slate-400">Water Treeing</span>
+                  <span className="text-slate-400">ML Layer 4</span>
                 </div>
               </div>
             </div>
